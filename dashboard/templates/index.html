@@ -1,0 +1,338 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Agent Swarm Dashboard</h1>
+
+<!-- Stats Overview -->
+<div class="grid-4">
+    <div class="stat-card">
+        <h3 id="stat-agents">{{ active_agents }}</h3>
+        <p>Active Agents</p>
+    </div>
+    <div class="stat-card">
+        <h3 id="stat-topology">{{ current_topology }}</h3>
+        <p>Current Topology</p>
+    </div>
+    <div class="stat-card">
+        <h3 id="stat-tasks">0</h3>
+        <p>Tasks Completed</p>
+    </div>
+    <div class="stat-card">
+        <h3 id="stat-errors">0</h3>
+        <p>Error Rate</p>
+    </div>
+</div>
+
+<br>
+
+<div class="grid">
+    <div>
+        <article>
+            <header>
+                <h3>Topology Visualization</h3>
+            </header>
+            <div class="topology-viz" id="topology-viz">
+                <svg viewBox="0 0 400 300" id="topology-svg" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Will be populated by JavaScript using DOM methods -->
+                </svg>
+            </div>
+            <footer>
+                <div class="topology-buttons">
+                    <button onclick="switchTopology('swarm')" id="btn-swarm">Swarm</button>
+                    <button onclick="switchTopology('hierarchy')" id="btn-hierarchy">Hierarchy</button>
+                    <button onclick="switchTopology('pipeline')" id="btn-pipeline">Pipeline</button>
+                    <button onclick="switchTopology('mesh')" id="btn-mesh">Mesh</button>
+                    <button onclick="switchTopology('ring')" id="btn-ring">Ring</button>
+                    <button onclick="switchTopology('star')" id="btn-star">Star</button>
+                </div>
+            </footer>
+        </article>
+    </div>
+    <div>
+        <article>
+            <header>
+                <h3>Recent Events</h3>
+            </header>
+            <div class="event-log" id="event-log">
+                <div class="event">
+                    <span class="timestamp">--:--:--</span>
+                    Waiting for events...
+                </div>
+            </div>
+        </article>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentTopology = '{{ current_topology }}';
+    const SVG_NS = 'http://www.w3.org/2000/svg';
+
+    // Helper to create SVG elements safely
+    function createSvgElement(tag, attrs) {
+        const el = document.createElementNS(SVG_NS, tag);
+        for (const [key, value] of Object.entries(attrs)) {
+            el.setAttribute(key, String(value));
+        }
+        return el;
+    }
+
+    // Update topology button states
+    function updateTopologyButtons() {
+        document.querySelectorAll('.topology-buttons button').forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.id === 'btn-' + currentTopology) {
+                btn.classList.add('active');
+            }
+        });
+    }
+
+    // Switch topology
+    async function switchTopology(type) {
+        try {
+            const response = await fetch('/api/topology/switch/' + encodeURIComponent(type), {
+                method: 'POST'
+            });
+            const data = await response.json();
+            if (response.ok) {
+                currentTopology = type;
+                document.getElementById('stat-topology').textContent = type;
+                updateTopologyButtons();
+                drawTopology(type);
+                addEvent('Switched topology to ' + type);
+            } else {
+                addEvent('Error: ' + data.detail, 'error');
+            }
+        } catch (error) {
+            addEvent('Error: ' + error.message, 'error');
+        }
+    }
+
+    // Draw topology visualization using safe DOM methods
+    function drawTopology(type) {
+        const svg = document.getElementById('topology-svg');
+        // Clear existing content safely
+        while (svg.firstChild) {
+            svg.removeChild(svg.firstChild);
+        }
+
+        const agents = parseInt(document.getElementById('stat-agents').textContent) || 5;
+        const cx = 200, cy = 150, r = 100;
+
+        switch(type) {
+            case 'swarm':
+                // All connected to all
+                for (let i = 0; i < agents; i++) {
+                    const angle = (2 * Math.PI * i) / agents;
+                    const x = cx + r * Math.cos(angle);
+                    const y = cy + r * Math.sin(angle);
+                    for (let j = i + 1; j < agents; j++) {
+                        const angle2 = (2 * Math.PI * j) / agents;
+                        const x2 = cx + r * Math.cos(angle2);
+                        const y2 = cy + r * Math.sin(angle2);
+                        svg.appendChild(createSvgElement('line', {
+                            x1: x, y1: y, x2: x2, y2: y2,
+                            stroke: '#636e72', 'stroke-width': 1, opacity: 0.3
+                        }));
+                    }
+                }
+                for (let i = 0; i < agents; i++) {
+                    const angle = (2 * Math.PI * i) / agents;
+                    const x = cx + r * Math.cos(angle);
+                    const y = cy + r * Math.sin(angle);
+                    svg.appendChild(createSvgElement('circle', {
+                        cx: x, cy: y, r: 15, fill: '#00d4aa'
+                    }));
+                }
+                break;
+
+            case 'hierarchy':
+                // Tree structure
+                svg.appendChild(createSvgElement('circle', {
+                    cx: cx, cy: 50, r: 15, fill: '#00d4aa'
+                }));
+                const levelAgents = Math.min(agents - 1, 4);
+                for (let i = 0; i < levelAgents; i++) {
+                    const x = 100 + (200 / (levelAgents - 1 || 1)) * i;
+                    svg.appendChild(createSvgElement('line', {
+                        x1: cx, y1: 65, x2: x, y2: 135,
+                        stroke: '#636e72', 'stroke-width': 2
+                    }));
+                    svg.appendChild(createSvgElement('circle', {
+                        cx: x, cy: 150, r: 12, fill: '#00b894'
+                    }));
+                }
+                break;
+
+            case 'pipeline':
+                // Sequential
+                const stepWidth = 300 / agents;
+                for (let i = 0; i < agents; i++) {
+                    const x = 50 + stepWidth * i;
+                    if (i < agents - 1) {
+                        svg.appendChild(createSvgElement('line', {
+                            x1: x + 15, y1: cy, x2: x + stepWidth - 15, y2: cy,
+                            stroke: '#636e72', 'stroke-width': 2
+                        }));
+                    }
+                    svg.appendChild(createSvgElement('circle', {
+                        cx: x, cy: cy, r: 15, fill: '#00d4aa'
+                    }));
+                }
+                break;
+
+            case 'mesh':
+                // Grid
+                const cols = Math.ceil(Math.sqrt(agents));
+                const rows = Math.ceil(agents / cols);
+                const spacing = 70;
+                const startX = cx - (cols - 1) * spacing / 2;
+                const startY = cy - (rows - 1) * spacing / 2;
+                let idx = 0;
+                for (let row = 0; row < rows && idx < agents; row++) {
+                    for (let col = 0; col < cols && idx < agents; col++) {
+                        const x = startX + col * spacing;
+                        const y = startY + row * spacing;
+                        if (col < cols - 1 && idx + 1 < agents) {
+                            svg.appendChild(createSvgElement('line', {
+                                x1: x + 15, y1: y, x2: x + spacing - 15, y2: y,
+                                stroke: '#636e72', 'stroke-width': 2
+                            }));
+                        }
+                        if (row < rows - 1 && idx + cols < agents) {
+                            svg.appendChild(createSvgElement('line', {
+                                x1: x, y1: y + 15, x2: x, y2: y + spacing - 15,
+                                stroke: '#636e72', 'stroke-width': 2
+                            }));
+                        }
+                        svg.appendChild(createSvgElement('circle', {
+                            cx: x, cy: y, r: 15, fill: '#00d4aa'
+                        }));
+                        idx++;
+                    }
+                }
+                break;
+
+            case 'ring':
+                // Circle
+                for (let i = 0; i < agents; i++) {
+                    const angle = (2 * Math.PI * i) / agents - Math.PI / 2;
+                    const x = cx + r * Math.cos(angle);
+                    const y = cy + r * Math.sin(angle);
+                    const nextAngle = (2 * Math.PI * ((i + 1) % agents)) / agents - Math.PI / 2;
+                    const nextX = cx + r * Math.cos(nextAngle);
+                    const nextY = cy + r * Math.sin(nextAngle);
+                    svg.appendChild(createSvgElement('line', {
+                        x1: x, y1: y, x2: nextX, y2: nextY,
+                        stroke: '#636e72', 'stroke-width': 2
+                    }));
+                    svg.appendChild(createSvgElement('circle', {
+                        cx: x, cy: y, r: 15, fill: '#00d4aa'
+                    }));
+                }
+                break;
+
+            case 'star':
+                // Hub and spoke
+                svg.appendChild(createSvgElement('circle', {
+                    cx: cx, cy: cy, r: 20, fill: '#00d4aa'
+                }));
+                for (let i = 0; i < agents - 1; i++) {
+                    const angle = (2 * Math.PI * i) / (agents - 1);
+                    const x = cx + r * Math.cos(angle);
+                    const y = cy + r * Math.sin(angle);
+                    svg.appendChild(createSvgElement('line', {
+                        x1: cx, y1: cy, x2: x, y2: y,
+                        stroke: '#636e72', 'stroke-width': 2
+                    }));
+                    svg.appendChild(createSvgElement('circle', {
+                        cx: x, cy: y, r: 12, fill: '#00b894'
+                    }));
+                }
+                break;
+        }
+    }
+
+    // Add event to log using safe DOM methods
+    function addEvent(message, type) {
+        type = type || 'info';
+        const log = document.getElementById('event-log');
+        const now = new Date().toLocaleTimeString();
+
+        const event = document.createElement('div');
+        event.className = 'event';
+
+        const timestamp = document.createElement('span');
+        timestamp.className = 'timestamp';
+        timestamp.textContent = now;
+
+        const text = document.createElement('span');
+        text.textContent = ' ' + message;
+        if (type === 'error') {
+            text.style.color = 'var(--error)';
+        }
+
+        event.appendChild(timestamp);
+        event.appendChild(text);
+        log.insertBefore(event, log.firstChild);
+
+        // Keep only last 50 events
+        while (log.children.length > 50) {
+            log.removeChild(log.lastChild);
+        }
+    }
+
+    // Handle WebSocket messages
+    function onWebSocketMessage(data) {
+        switch(data.type) {
+            case 'agent_joined':
+                var count = parseInt(document.getElementById('stat-agents').textContent) + 1;
+                document.getElementById('stat-agents').textContent = String(count);
+                addEvent('Agent joined: ' + (data.data.name || data.data.agent_id));
+                drawTopology(currentTopology);
+                break;
+
+            case 'agent_left':
+                var newCount = Math.max(0, parseInt(document.getElementById('stat-agents').textContent) - 1);
+                document.getElementById('stat-agents').textContent = String(newCount);
+                addEvent('Agent left: ' + data.data.agent_id);
+                drawTopology(currentTopology);
+                break;
+
+            case 'topology_changed':
+                currentTopology = data.data.new_type;
+                document.getElementById('stat-topology').textContent = currentTopology;
+                updateTopologyButtons();
+                drawTopology(currentTopology);
+                addEvent('Topology changed: ' + data.data.old_type + ' -> ' + data.data.new_type);
+                break;
+        }
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', function() {
+        updateTopologyButtons();
+        drawTopology(currentTopology);
+        addEvent('Dashboard initialized');
+
+        // Poll for status updates
+        setInterval(async function() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                document.getElementById('stat-agents').textContent = String(data.active_agents);
+                document.getElementById('stat-topology').textContent = data.current_topology;
+                if (data.current_topology !== currentTopology) {
+                    currentTopology = data.current_topology;
+                    updateTopologyButtons();
+                    drawTopology(currentTopology);
+                }
+            } catch (error) {
+                console.error('Status poll error:', error);
+            }
+        }, 5000);
+    });
+</script>
+{% endblock %}

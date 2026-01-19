@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} - Titan</title>
+
+    <!-- Pico CSS for styling -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+
+    <style>
+        :root {
+            --primary: #00d4aa;
+            --primary-hover: #00b894;
+            --secondary: #636e72;
+            --success: #00b894;
+            --warning: #fdcb6e;
+            --error: #d63031;
+        }
+
+        body {
+            min-height: 100vh;
+        }
+
+        nav {
+            background: var(--card-background-color);
+            padding: 1rem 2rem;
+            border-bottom: 1px solid var(--muted-border-color);
+        }
+
+        nav .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--primary);
+            text-decoration: none;
+        }
+
+        nav ul {
+            margin: 0;
+            padding: 0;
+        }
+
+        main {
+            padding: 2rem;
+        }
+
+        .stat-card {
+            background: var(--card-background-color);
+            padding: 1.5rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-card h3 {
+            margin: 0;
+            font-size: 2.5rem;
+            color: var(--primary);
+        }
+
+        .stat-card p {
+            margin: 0.5rem 0 0;
+            color: var(--muted-color);
+        }
+
+        .grid-4 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .topology-viz {
+            background: var(--card-background-color);
+            border-radius: 8px;
+            padding: 2rem;
+            min-height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .topology-viz svg {
+            max-width: 100%;
+            max-height: 300px;
+        }
+
+        .agent-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .agent-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem;
+            background: var(--card-background-color);
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+        }
+
+        .agent-item .status {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 1rem;
+        }
+
+        .agent-item .status.running { background: var(--success); }
+        .agent-item .status.paused { background: var(--warning); }
+        .agent-item .status.failed { background: var(--error); }
+
+        .topology-buttons {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .topology-buttons button {
+            flex: 1;
+            min-width: 100px;
+        }
+
+        .topology-buttons button.active {
+            background: var(--primary);
+        }
+
+        .event-log {
+            background: var(--card-background-color);
+            border-radius: 8px;
+            padding: 1rem;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.85rem;
+        }
+
+        .event-log .event {
+            padding: 0.5rem;
+            border-bottom: 1px solid var(--muted-border-color);
+        }
+
+        .event-log .event:last-child {
+            border-bottom: none;
+        }
+
+        .event-log .timestamp {
+            color: var(--muted-color);
+        }
+
+        .ws-status {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+
+        .ws-status.connected { background: var(--success); }
+        .ws-status.disconnected { background: var(--error); }
+    </style>
+</head>
+<body>
+    <nav>
+        <ul>
+            <li><a href="/" class="logo">TITAN</a></li>
+        </ul>
+        <ul>
+            <li><a href="/">Dashboard</a></li>
+            <li><a href="/agents">Agents</a></li>
+            <li><a href="/topology">Topology</a></li>
+            <li><span class="ws-status disconnected" id="ws-status"></span> <small id="ws-status-text">Disconnected</small></li>
+        </ul>
+    </nav>
+
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+
+    <script>
+        // WebSocket connection
+        let ws = null;
+        let reconnectInterval = null;
+
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+
+            ws.onopen = () => {
+                document.getElementById('ws-status').className = 'ws-status connected';
+                document.getElementById('ws-status-text').textContent = 'Connected';
+                if (reconnectInterval) {
+                    clearInterval(reconnectInterval);
+                    reconnectInterval = null;
+                }
+            };
+
+            ws.onclose = () => {
+                document.getElementById('ws-status').className = 'ws-status disconnected';
+                document.getElementById('ws-status-text').textContent = 'Disconnected';
+                // Try to reconnect
+                if (!reconnectInterval) {
+                    reconnectInterval = setInterval(connectWebSocket, 5000);
+                }
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                handleWebSocketMessage(data);
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+        }
+
+        function handleWebSocketMessage(data) {
+            // Override in pages that need real-time updates
+            if (typeof onWebSocketMessage === 'function') {
+                onWebSocketMessage(data);
+            }
+        }
+
+        // Connect on page load
+        document.addEventListener('DOMContentLoaded', connectWebSocket);
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

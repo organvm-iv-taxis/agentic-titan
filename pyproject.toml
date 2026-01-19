@@ -1,0 +1,85 @@
+[project]
+name = "agentic-titan"
+version = "0.1.0"
+description = "Polymorphic Agent Swarm Architecture - Model-agnostic, self-organizing multi-agent system"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [
+    { name = "Agentic Titan Team" }
+]
+keywords = ["agents", "llm", "multi-agent", "swarm", "orchestration"]
+
+dependencies = [
+    "redis>=5.0.0",
+    "pyyaml>=6.0",
+    "pydantic>=2.0",
+    "httpx>=0.25.0",
+    "anthropic>=0.40.0",
+    "openai>=1.0.0",
+    "rich>=13.0.0",
+    "typer>=0.12.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.0",
+    "ruff>=0.1.0",
+    "mypy>=1.8.0",
+]
+local-llm = [
+    "ollama>=0.1.0",
+]
+vector-db = [
+    "chromadb>=0.5.0",
+]
+messaging = [
+    "nats-py>=2.6.0",
+]
+embeddings = [
+    "sentence-transformers>=2.2.0",
+]
+dashboard = [
+    "fastapi>=0.110.0",
+    "uvicorn>=0.27.0",
+    "jinja2>=3.1.0",
+]
+metrics = [
+    "prometheus-client>=0.19.0",
+]
+stress = [
+    "psutil>=5.9.0",
+]
+all = [
+    "agentic-titan[local-llm,vector-db,messaging,embeddings,dashboard,metrics,stress]",
+]
+
+[project.scripts]
+titan = "titan.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["titan", "agents", "hive", "adapters", "runtime", "dashboard"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_ignores = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-v --tb=short"

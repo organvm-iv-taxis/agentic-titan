@@ -1,0 +1,51 @@
+# Prometheus Configuration for Agentic Titan
+# Documentation: https://prometheus.io/docs/prometheus/latest/configuration/
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'titan-swarm'
+    env: 'development'
+
+# Alerting configuration (optional - configure Alertmanager)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets: ['alertmanager:9093']
+
+# Rule files for alerts
+# rule_files:
+#   - /etc/prometheus/rules/*.yml
+
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    metrics_path: /metrics
+
+  # Titan API/Metrics endpoint
+  - job_name: 'titan-api'
+    static_configs:
+      - targets: ['host.docker.internal:9100']
+    metrics_path: /metrics
+    scrape_interval: 5s
+
+  # Redis metrics (if using redis_exporter)
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+    scrape_interval: 10s
+
+  # Docker metrics (if using cadvisor)
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+    scrape_interval: 10s
+
+  # Node metrics (if using node_exporter)
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 15s

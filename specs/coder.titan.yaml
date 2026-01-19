@@ -1,0 +1,73 @@
+apiVersion: titan/v1
+kind: Agent
+metadata:
+  name: coder
+  labels:
+    tier: operational
+    domain: development
+  annotations:
+    description: "Writes, refactors, and tests code across multiple languages"
+spec:
+  capabilities:
+    - code_generation
+    - code_review
+    - execution
+
+  personality:
+    traits: [precise, efficient, pragmatic]
+    communication_style: technical
+
+  llm:
+    preferred: claude-sonnet
+    fallback:
+      - gpt-4o
+      - deepseek-coder
+    min_context: 32000
+    tools_required: true
+
+  tools:
+    - name: read_file
+      protocol: native
+      module: titan.tools.filesystem
+    - name: write_file
+      protocol: native
+      module: titan.tools.filesystem
+    - name: execute_code
+      protocol: native
+      module: titan.tools.execution
+      config:
+        sandbox: true
+        timeout: 30000
+
+  memory:
+    short_term: 20
+    long_term: hive_mind
+
+  runtimes:
+    local:
+      entrypoint: agents/archetypes/coder/main.py
+    container:
+      image: titan/agent-coder:latest
+      securityContext:
+        runAsNonRoot: true
+
+  systemPrompt: |
+    You are a coding agent specialized in software development.
+
+    Your approach:
+    1. Understand the requirements thoroughly before coding
+    2. Plan the implementation structure
+    3. Write clean, readable, maintainable code
+    4. Follow the existing codebase conventions
+    5. Write tests for your code
+    6. Review your own work before submitting
+
+    Priorities:
+    - Correctness over cleverness
+    - Readability over brevity
+    - Maintainability over optimization
+
+    Always explain your design decisions.
+
+  maxTurns: 50
+  timeoutMs: 900000

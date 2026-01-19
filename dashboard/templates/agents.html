@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Agent Management</h1>
+
+<div class="grid">
+    <div>
+        <article>
+            <header>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3>Active Agents ({{ agents|length }})</h3>
+                    <button class="outline" onclick="refreshAgents()">Refresh</button>
+                </div>
+            </header>
+
+            <ul class="agent-list" id="agent-list">
+                {% if agents %}
+                    {% for agent in agents %}
+                    <li class="agent-item">
+                        <div style="display: flex; align-items: center;">
+                            <span class="status {{ agent.state }}"></span>
+                            <div>
+                                <strong>{{ agent.name }}</strong>
+                                <br>
+                                <small>{{ agent.id }}</small>
+                            </div>
+                        </div>
+                        <div>
+                            <small>Role: {{ agent.role or 'worker' }}</small>
+                            <br>
+                            <button class="outline secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;" onclick="cancelAgent('{{ agent.id }}')">Cancel</button>
+                        </div>
+                    </li>
+                    {% endfor %}
+                {% else %}
+                    <li class="agent-item">
+                        <em>No active agents</em>
+                    </li>
+                {% endif %}
+            </ul>
+        </article>
+    </div>
+
+    <div>
+        <article>
+            <header>
+                <h3>Agent Statistics</h3>
+            </header>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Archetype</th>
+                        <th>Active</th>
+                        <th>Completed</th>
+                        <th>Errors</th>
+                    </tr>
+                </thead>
+                <tbody id="stats-table">
+                    <tr>
+                        <td colspan="4"><em>Loading statistics...</em></td>
+                    </tr>
+                </tbody>
+            </table>
+        </article>
+
+        <article>
+            <header>
+                <h3>Spawn Agent</h3>
+            </header>
+
+            <form onsubmit="spawnAgent(event)">
+                <label>
+                    Archetype
+                    <select name="archetype" id="spawn-archetype">
+                        <option value="researcher">Researcher</option>
+                        <option value="coder">Coder</option>
+                        <option value="reviewer">Reviewer</option>
+                        <option value="orchestrator">Orchestrator</option>
+                    </select>
+                </label>
+
+                <label>
+                    Task
+                    <textarea name="task" id="spawn-task" rows="3" placeholder="Enter task description..."></textarea>
+                </label>
+
+                <button type="submit">Spawn Agent</button>
+            </form>
+        </article>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function refreshAgents() {
+        try {
+            const response = await fetch('/api/agents');
+            const agents = await response.json();
+            updateAgentList(agents);
+        } catch (error) {
+            console.error('Failed to refresh agents:', error);
+        }
+    }
+
+    function updateAgentList(agents) {
+        const list = document.getElementById('agent-list');
+        // Clear list safely
+        while (list.firstChild) {
+            list.removeChild(list.firstChild);
+        }
+
+        if (agents.length === 0) {
+            const li = document.createElement('li');
+            li.className = 'agent-item';
+            const em = document.createElement('em');
+            em.textContent = 'No active agents';
+            li.appendChild(em);
+            list.appendChild(li);
+            return;
+        }
+
+        agents.forEach(function(agent) {
+            const li = document.createElement('li');
+            li.className = 'agent-item';
+
+            const leftDiv = document.createElement('div');
+            leftDiv.style.display = 'flex';
+            leftDiv.style.alignItems = 'center';
+
+            const status = document.createElement('span');
+            status.className = 'status ' + (agent.state || 'running');
+
+            const infoDiv = document.createElement('div');
+            const strong = document.createElement('strong');
+            strong.textContent = agent.name;
+            const br1 = document.createElement('br');
+            const small1 = document.createElement('small');
+            small1.textContent = agent.id;
+
+            infoDiv.appendChild(strong);
+            infoDiv.appendChild(br1);
+            infoDiv.appendChild(small1);
+
+            leftDiv.appendChild(status);
+            leftDiv.appendChild(infoDiv);
+
+            const rightDiv = document.createElement('div');
+            const roleSmall = document.createElement('small');
+            roleSmall.textContent = 'Role: ' + (agent.role || 'worker');
+            const br2 = document.createElement('br');
+            const cancelBtn = document.createElement('button');
+            cancelBtn.className = 'outline secondary';
+            cancelBtn.style.cssText = 'padding: 0.25rem 0.5rem; font-size: 0.75rem;';
+            cancelBtn.textContent = 'Cancel';
+            cancelBtn.onclick = function() { cancelAgent(agent.id); };
+
+            rightDiv.appendChild(roleSmall);
+            rightDiv.appendChild(br2);
+            rightDiv.appendChild(cancelBtn);
+
+            li.appendChild(leftDiv);
+            li.appendChild(rightDiv);
+            list.appendChild(li);
+        });
+    }
+
+    async function cancelAgent(agentId) {
+        if (!confirm('Cancel agent ' + agentId + '?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/agents/' + encodeURIComponent(agentId) + '/cancel', {
+                method: 'POST'
+            });
+            if (response.ok) {
+                refreshAgents();
+            } else {
+                const data = await response.json();
+                alert('Failed to cancel: ' + data.detail);
+            }
+        } catch (error) {
+            alert('Error: ' + error.message);
+        }
+    }
+
+    function spawnAgent(event) {
+        event.preventDefault();
+        const archetype = document.getElementById('spawn-archetype').value;
+        const task = document.getElementById('spawn-task').value;
+
+        alert('Agent spawning not yet implemented.\n\nArchetype: ' + archetype + '\nTask: ' + task);
+    }
+
+    function onWebSocketMessage(data) {
+        if (data.type === 'agent_joined' || data.type === 'agent_left') {
+            refreshAgents();
+        }
+    }
+
+    // Initial load
+    document.addEventListener('DOMContentLoaded', refreshAgents);
+</script>
+{% endblock %}
