@@ -284,16 +284,25 @@ class LLMRouter:
         self,
         requires_tools: bool = False,
         preferred_model: str | None = None,
-    ) -> LLMProvider:
-        """Select the best provider for a request."""
+    ) -> tuple[LLMProvider, bool]:
+        """
+        Select the best provider for a request.
+
+        Returns:
+            Tuple of (provider, supports_native_tools)
+            If tools are required but no provider supports them,
+            returns a provider that can simulate tools via prompts.
+        """
+        # First, try to find a provider that supports tools natively
+        if requires_tools:
+            for provider in self._fallback_chain:
+                info = self._providers[provider]
+                if info.supports_tools:
+                    return provider, True
+
+        # Fall back to any available provider
         for provider in self._fallback_chain:
-            info = self._providers[provider]
-
-            # Check tool requirement
-            if requires_tools and not info.supports_tools:
-                continue
-
-            return provider
+            return provider, self._providers[provider].supports_tools
 
         raise LLMAdapterError("No suitable provider available")
 
@@ -326,11 +335,22 @@ class LLMRouter:
         await self._ensure_initialized()
 
         # Select provider
+        supports_native_tools = True
         if provider:
             if not self._providers[provider].available:
                 raise LLMAdapterError(f"Provider {provider.value} not available")
+            supports_native_tools = self._providers[provider].supports_tools
         else:
-            provider = self._select_provider(requires_tools=bool(tools))
+            provider, supports_native_tools = self._select_provider(requires_tools=bool(tools))
+
+        # If tools are requested but provider doesn't support them natively,
+        # simulate tools via prompt injection
+        actual_tools = tools
+        actual_system = system
+        if tools and not supports_native_tools:
+            logger.info(f"Provider {provider.value} doesn't support tools natively, using prompt-based tools")
+            actual_tools = None
+            actual_system = self._build_tool_prompt(system, tools)
 
         adapter = self._get_adapter(provider, model)
 
@@ -344,11 +364,16 @@ class LLMRouter:
                 adapter = self._get_adapter(fallback_provider, model)
                 response = await adapter.complete(
                     messages,
-                    system=system,
-                    tools=tools,
+                    system=actual_system,
+                    tools=actual_tools,
                     temperature=temperature,
                     max_tokens=max_tokens,
                 )
+
+                # If using simulated tools, parse tool calls from response
+                if tools and not supports_native_tools:
+                    response = self._parse_simulated_tools(response)
+
                 return response
             except Exception as e:
                 last_error = e
@@ -359,6 +384,71 @@ class LLMRouter:
         raise LLMAdapterError(
             f"All providers failed: {last_error}",
             provider=provider.value if provider else None,
+        )
+
+    def _build_tool_prompt(self, system: str | None, tools: list[Tool]) -> str:
+        """Build a system prompt that includes tool definitions for non-native tool support."""
+        tool_descriptions = []
+        for i, tool in enumerate(tools, 1):
+            params = tool.parameters
+            if isinstance(params, dict) and "properties" in params:
+                props = params["properties"]
+                param_parts = [f"{name}: {info.get('type', 'any')}" for name, info in props.items()]
+                param_str = ", ".join(param_parts) if param_parts else "no parameters"
+            else:
+                param_str = str(params)
+            tool_descriptions.append(f"{i}. {tool.name}({param_str}): {tool.description}")
+
+        tools_section = f"""
+You have access to the following tools:
+
+{chr(10).join(tool_descriptions)}
+
+To use a tool, respond with:
+<tool_call>
+{{"name": "tool_name", "arguments": {{"arg1": "value1"}}}}
+</tool_call>
+
+After the tool result is provided, continue your response.
+If you don't need to use a tool, just respond normally.
+"""
+        base_system = system or "You are a helpful assistant."
+        return f"{base_system}\n\n{tools_section}"
+
+    def _parse_simulated_tools(self, response: LLMResponse) -> LLMResponse:
+        """Parse tool calls from text response for non-native tool support."""
+        import re
+        import json
+
+        content = response.content
+        tool_calls = []
+
+        # Find all <tool_call>...</tool_call> blocks
+        pattern = r'<tool_call>\s*(.*?)\s*</tool_call>'
+        matches = re.findall(pattern, content, re.DOTALL)
+
+        for i, match in enumerate(matches):
+            try:
+                call_data = json.loads(match)
+                tool_calls.append({
+                    "id": f"sim_call_{i}",
+                    "name": call_data.get("name", "unknown"),
+                    "arguments": call_data.get("arguments", {}),
+                })
+            except json.JSONDecodeError:
+                logger.warning(f"Failed to parse tool call: {match[:100]}")
+
+        # Remove tool call blocks from content
+        clean_content = re.sub(pattern, '', content, flags=re.DOTALL).strip()
+
+        return LLMResponse(
+            content=clean_content,
+            model=response.model,
+            provider=response.provider,
+            finish_reason=response.finish_reason,
+            usage=response.usage,
+            tool_calls=tool_calls,
+            raw_response=response.raw_response,
         )
 
     async def stream(
@@ -389,18 +479,28 @@ class LLMRouter:
         """
         await self._ensure_initialized()
 
+        supports_native_tools = True
         if provider:
             if not self._providers[provider].available:
                 raise LLMAdapterError(f"Provider {provider.value} not available")
+            supports_native_tools = self._providers[provider].supports_tools
         else:
-            provider = self._select_provider(requires_tools=bool(tools))
+            provider, supports_native_tools = self._select_provider(requires_tools=bool(tools))
+
+        # If tools are requested but provider doesn't support them natively,
+        # simulate tools via prompt injection
+        actual_tools = tools
+        actual_system = system
+        if tools and not supports_native_tools:
+            actual_tools = None
+            actual_system = self._build_tool_prompt(system, tools)
 
         adapter = self._get_adapter(provider, model)
 
         async for token in adapter.stream(
             messages,
-            system=system,
-            tools=tools,
+            system=actual_system,
+            tools=actual_tools,
             temperature=temperature,
             max_tokens=max_tokens,
         ):
