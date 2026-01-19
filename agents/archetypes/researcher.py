@@ -49,11 +49,10 @@ class ResearcherAgent(BaseAgent):
         topic: str | None = None,
         **kwargs: Any,
     ) -> None:
-        super().__init__(
-            name="researcher",
-            capabilities=["web_search", "document_analysis", "summarization"],
-            **kwargs,
-        )
+        # Set defaults that can be overridden by kwargs
+        kwargs.setdefault("name", "researcher")
+        kwargs.setdefault("capabilities", ["web_search", "document_analysis", "summarization"])
+        super().__init__(**kwargs)
         self.topic = topic
         self.task: ResearchTask | None = None
         self._router = get_router()

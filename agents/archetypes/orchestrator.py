@@ -68,11 +68,10 @@ class OrchestratorAgent(BaseAgent):
         topology_engine: Any | None = None,
         **kwargs: Any,
     ) -> None:
-        super().__init__(
-            name="orchestrator",
-            capabilities=["planning", "execution"],
-            **kwargs,
-        )
+        # Set defaults that can be overridden by kwargs
+        kwargs.setdefault("name", "orchestrator")
+        kwargs.setdefault("capabilities", ["planning", "execution"])
+        super().__init__(**kwargs)
         self.task = task
         self.available_agents = available_agents or ["researcher", "coder", "reviewer"]
         self._topology_engine = topology_engine

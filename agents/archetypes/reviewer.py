@@ -77,11 +77,10 @@ class ReviewerAgent(BaseAgent):
         review_type: str = "code",
         **kwargs: Any,
     ) -> None:
-        super().__init__(
-            name="reviewer",
-            capabilities=["code_review", "document_analysis", "summarization"],
-            **kwargs,
-        )
+        # Set defaults that can be overridden by kwargs
+        kwargs.setdefault("name", "reviewer")
+        kwargs.setdefault("capabilities", ["code_review", "document_analysis", "summarization"])
+        super().__init__(**kwargs)
         self.content = content
         self.review_type = review_type
         self.result: ReviewResult | None = None

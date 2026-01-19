@@ -1,0 +1,153 @@
+{
+  "config": {
+    "scenario_name": "chaos",
+    "target_agents": 30,
+    "duration_seconds": 45,
+    "ramp_up_seconds": 10,
+    "warmup_seconds": 5,
+    "max_concurrent": 20,
+    "batch_size": 5,
+    "batch_delay_ms": 100,
+    "failure_rate": 0.1,
+    "timeout_rate": 0.0,
+    "topology_switch_interval": 0
+  },
+  "metrics": {
+    "latency": {
+      "agent_spawn": {
+        "count": 35,
+        "mean": 0.09,
+        "min": 0.01,
+        "max": 2.18,
+        "stddev": 0.37,
+        "p50": 0.02,
+        "p90": 0.08,
+        "p95": 0.09,
+        "p99": 1.48
+      },
+      "agent_init": {
+        "count": 0,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0,
+        "p50": 0.0,
+        "p90": 0.0,
+        "p95": 0.0,
+        "p99": 0.0
+      },
+      "agent_work": {
+        "count": 31,
+        "mean": 3,
+        "min": 0,
+        "max": 62,
+        "stddev": 11.4,
+        "p50": 0.0,
+        "p90": 8.0,
+        "p95": 11.5,
+        "p99": 47.3
+      },
+      "agent_shutdown": {
+        "count": 0,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0,
+        "p50": 0.0,
+        "p90": 0.0,
+        "p95": 0.0,
+        "p99": 0.0
+      },
+      "total_agent": {
+        "count": 35,
+        "mean": 3.05,
+        "min": 0.01,
+        "max": 62.7,
+        "stddev": 10.82,
+        "p50": 0.38,
+        "p90": 5.4,
+        "p95": 11.65,
+        "p99": 45.95
+      },
+      "topology_switch": {
+        "count": 0,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0,
+        "p50": 0.0,
+        "p90": 0.0,
+        "p95": 0.0,
+        "p99": 0.0
+      },
+      "agent_migration": {
+        "count": 0,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0,
+        "p50": 0.0,
+        "p90": 0.0,
+        "p95": 0.0,
+        "p99": 0.0
+      },
+      "message": {
+        "count": 0,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0,
+        "p50": 0.0,
+        "p90": 0.0,
+        "p95": 0.0,
+        "p99": 0.0
+      },
+      "broadcast": {
+        "count": 0,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0,
+        "p50": 0.0,
+        "p90": 0.0,
+        "p95": 0.0,
+        "p99": 0.0
+      }
+    },
+    "throughput": {
+      "agents": {
+        "total_ops": 31,
+        "elapsed_seconds": 50.19,
+        "ops_per_second": 0.62,
+        "current_rate": 2.32
+      },
+      "messages": {
+        "total_ops": 0,
+        "elapsed_seconds": 50.19,
+        "ops_per_second": 0.0,
+        "current_rate": 0.0
+      }
+    },
+    "errors": {
+      "error_count": 4,
+      "timeout_count": 0,
+      "cancelled_count": 0,
+      "success_count": 31,
+      "success_rate": 0.8857,
+      "error_rate": 0.1143
+    },
+    "resources": {
+      "peak_memory_mb": 0.0,
+      "peak_agents": 0
+    }
+  },
+  "scenario_name": "chaos",
+  "start_time": "2026-01-19T11:17:21.440762",
+  "end_time": "2026-01-19T11:18:11.626128",
+  "duration_seconds": 50.185366,
+  "success": true,
+  "error": null,
+  "agent_results": [],
+  "topology_switches": [],
+  "events": []
+}

@@ -1,0 +1,153 @@
+{
+  "config": {
+    "scenario_name": "swarm",
+    "target_agents": 20,
+    "duration_seconds": 30,
+    "ramp_up_seconds": 10,
+    "warmup_seconds": 5,
+    "max_concurrent": 20,
+    "batch_size": 5,
+    "batch_delay_ms": 100,
+    "failure_rate": 0.0,
+    "timeout_rate": 0.0,
+    "topology_switch_interval": 0
+  },
+  "metrics": {
+    "latency": {
+      "agent_spawn": {
+        "count": 25,
+        "mean": 0.32,
+        "min": 0.01,
+        "max": 7.15,
+        "stddev": 1.42,
+        "p50": 0.02,
+        "p90": 0.13,
+        "p95": 0.15,
+        "p99": 5.47
+      },
+      "agent_init": {
+        "count": 0,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0,
+        "p50": 0.0,
+        "p90": 0.0,
+        "p95": 0.0,
+        "p99": 0.0
+      },
+      "agent_work": {
+        "count": 25,
+        "mean": 10.48,
+        "min": 0,
+        "max": 100,
+        "stddev": 23.04,
+        "p50": 0.0,
+        "p90": 36.8,
+        "p95": 40.4,
+        "p99": 85.84
+      },
+      "agent_shutdown": {
+        "count": 0,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0,
+        "p50": 0.0,
+        "p90": 0.0,
+        "p95": 0.0,
+        "p99": 0.0
+      },
+      "total_agent": {
+        "count": 25,
+        "mean": 10.9,
+        "min": 0.35,
+        "max": 100.8,
+        "stddev": 23.08,
+        "p50": 0.52,
+        "p90": 37.04,
+        "p95": 40.48,
+        "p99": 86.47
+      },
+      "topology_switch": {
+        "count": 0,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0,
+        "p50": 0.0,
+        "p90": 0.0,
+        "p95": 0.0,
+        "p99": 0.0
+      },
+      "agent_migration": {
+        "count": 0,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0,
+        "p50": 0.0,
+        "p90": 0.0,
+        "p95": 0.0,
+        "p99": 0.0
+      },
+      "message": {
+        "count": 0,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0,
+        "p50": 0.0,
+        "p90": 0.0,
+        "p95": 0.0,
+        "p99": 0.0
+      },
+      "broadcast": {
+        "count": 0,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0,
+        "p50": 0.0,
+        "p90": 0.0,
+        "p95": 0.0,
+        "p99": 0.0
+      }
+    },
+    "throughput": {
+      "agents": {
+        "total_ops": 25,
+        "elapsed_seconds": 35.16,
+        "ops_per_second": 0.71,
+        "current_rate": 2.0
+      },
+      "messages": {
+        "total_ops": 0,
+        "elapsed_seconds": 35.16,
+        "ops_per_second": 0.0,
+        "current_rate": 0.0
+      }
+    },
+    "errors": {
+      "error_count": 0,
+      "timeout_count": 0,
+      "cancelled_count": 0,
+      "success_count": 25,
+      "success_rate": 1.0,
+      "error_rate": 0.0
+    },
+    "resources": {
+      "peak_memory_mb": 0.0,
+      "peak_agents": 0
+    }
+  },
+  "scenario_name": "swarm",
+  "start_time": "2026-01-19T11:14:53.975009",
+  "end_time": "2026-01-19T11:15:29.137194",
+  "duration_seconds": 35.162185,
+  "success": true,
+  "error": null,
+  "agent_results": [],
+  "topology_switches": [],
+  "events": []
+}

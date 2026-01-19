@@ -52,11 +52,10 @@ class CoderAgent(BaseAgent):
         language: str = "python",
         **kwargs: Any,
     ) -> None:
-        super().__init__(
-            name="coder",
-            capabilities=["code_generation", "code_review", "execution"],
-            **kwargs,
-        )
+        # Set defaults that can be overridden by kwargs
+        kwargs.setdefault("name", "coder")
+        kwargs.setdefault("capabilities", ["code_generation", "code_review", "execution"])
+        super().__init__(**kwargs)
         self.task_description = task_description
         self.language = language
         self.task: CodeTask | None = None
