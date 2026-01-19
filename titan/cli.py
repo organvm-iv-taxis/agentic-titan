@@ -968,6 +968,124 @@ def observe(
 
 
 # ============================================================================
+# MCP Server
+# ============================================================================
+
+
+@app.command()
+def mcp(
+    action: str = typer.Argument("run", help="Action: run, test"),
+) -> None:
+    """
+    Run the Titan MCP Server.
+
+    This exposes agents via the Model Context Protocol (JSON-RPC over stdio).
+    Claude Code and other MCP clients can spawn and manage agents.
+
+    Actions:
+        run  - Start the MCP server on stdio
+        test - Run a quick self-test
+    """
+    from mcp.server import run_server, create_server
+
+    if action == "run":
+        say(ORCHESTRATOR, "Starting Titan MCP Server...")
+        console.print("[cyan]MCP Server ready on stdio[/cyan]")
+        console.print("Connect via Claude Code or other MCP clients")
+        console.print("")
+        console.print("Available tools:")
+        console.print("  • spawn_agent - Create agents (researcher, coder, reviewer, orchestrator)")
+        console.print("  • agent_status - Check agent progress")
+        console.print("  • agent_result - Get completed results")
+        console.print("  • list_agents - List active sessions")
+        console.print("  • cancel_agent - Cancel running agents")
+        console.print("")
+
+        # Run the server
+        run_server()
+
+    elif action == "test":
+        say(ORCHESTRATOR, "Testing MCP Server...")
+
+        async def run_test() -> None:
+            import json
+            server = create_server()
+
+            # Test initialize
+            from mcp.server import MCPRequest
+            init_req = MCPRequest(
+                jsonrpc="2.0",
+                id=1,
+                method="initialize",
+                params={"protocolVersion": "2024-11-05"},
+            )
+            resp = await server.handle_request(init_req)
+            console.print(f"[green]✓[/green] Initialize: {resp.result['serverInfo']['name']}")
+
+            # Test tools/list
+            tools_req = MCPRequest(
+                jsonrpc="2.0",
+                id=2,
+                method="tools/list",
+                params={},
+            )
+            resp = await server.handle_request(tools_req)
+            tool_names = [t["name"] for t in resp.result["tools"]]
+            console.print(f"[green]✓[/green] Tools: {', '.join(tool_names)}")
+
+            # Test resources/list
+            res_req = MCPRequest(
+                jsonrpc="2.0",
+                id=3,
+                method="resources/list",
+                params={},
+            )
+            resp = await server.handle_request(res_req)
+            res_names = [r["name"] for r in resp.result["resources"]]
+            console.print(f"[green]✓[/green] Resources: {', '.join(res_names)}")
+
+            # Test spawn_agent (simulated, won't actually run LLM)
+            spawn_req = MCPRequest(
+                jsonrpc="2.0",
+                id=4,
+                method="tools/call",
+                params={
+                    "name": "spawn_agent",
+                    "arguments": {
+                        "agent_type": "simple",
+                        "task": "Test task",
+                    },
+                },
+            )
+            resp = await server.handle_request(spawn_req)
+            content = json.loads(resp.result["content"][0]["text"])
+            console.print(f"[green]✓[/green] Spawn: session {content['session_id']}")
+
+            # Test list_agents
+            list_req = MCPRequest(
+                jsonrpc="2.0",
+                id=5,
+                method="tools/call",
+                params={
+                    "name": "list_agents",
+                    "arguments": {},
+                },
+            )
+            resp = await server.handle_request(list_req)
+            agents = json.loads(resp.result["content"][0]["text"])
+            console.print(f"[green]✓[/green] List: {len(agents)} active agents")
+
+            console.print("")
+            console.print("[green]All MCP tests passed![/green]")
+
+        asyncio.run(run_test())
+
+    else:
+        console.print(f"[red]Unknown action: {action}[/red]")
+        console.print("Available: run, test")
+
+
+# ============================================================================
 # Entry Point
 # ============================================================================
 
