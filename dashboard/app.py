@@ -15,6 +15,20 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, AsyncGenerator
 
+from dashboard.models import (
+    StatusResponse,
+    AgentResponse,
+    AgentCancelResponse,
+    TopologyResponse,
+    TopologySwitchResponse,
+    TopologyAgentInfo,
+    TopologyHistoryEntry,
+    LearningStatsResponse,
+    ErrorResponse,
+    TopologyTypeEnum,
+    AgentStateEnum,
+)
+
 logger = logging.getLogger("titan.dashboard")
 
 # Try to import FastAPI, provide helpful error if missing
@@ -116,6 +130,9 @@ class TitanDashboard:
             description="Web dashboard for Agentic Titan swarm management",
             version="1.0.0",
             lifespan=lifespan,
+            docs_url="/docs",
+            redoc_url="/redoc",
+            openapi_url="/openapi.json",
         )
 
         # Mount static files
@@ -181,73 +198,106 @@ class TitanDashboard:
         # API Routes
         # ====================================================================
 
-        @self.app.get("/api/status")
-        async def get_status() -> dict[str, Any]:
-            """Get system status."""
-            return {
-                "status": "healthy",
-                "active_agents": len(self._active_agents),
-                "current_topology": self._get_current_topology(),
-                "timestamp": datetime.now().isoformat(),
-            }
+        @self.app.get("/api/status", response_model=StatusResponse)
+        async def get_status() -> StatusResponse:
+            """Get system status including active agents and current topology."""
+            return StatusResponse(
+                status="healthy",
+                active_agents=len(self._active_agents),
+                current_topology=TopologyTypeEnum(self._get_current_topology()),
+                timestamp=datetime.now(),
+            )
 
-        @self.app.get("/api/agents")
-        async def get_agents() -> list[dict[str, Any]]:
-            """Get all active agents."""
-            return list(self._active_agents.values())
+        @self.app.get("/api/agents", response_model=list[AgentResponse])
+        async def get_agents() -> list[AgentResponse]:
+            """Get all active agents with their current state and capabilities."""
+            return [
+                AgentResponse(
+                    id=a["id"],
+                    name=a.get("name", "unknown"),
+                    role=a.get("role", "worker"),
+                    state=AgentStateEnum(a.get("state", "running")),
+                    joined_at=datetime.fromisoformat(a["joined_at"]) if isinstance(a.get("joined_at"), str) else datetime.now(),
+                    capabilities=a.get("capabilities", []),
+                )
+                for a in self._active_agents.values()
+            ]
 
-        @self.app.get("/api/agents/{agent_id}")
-        async def get_agent(agent_id: str) -> dict[str, Any]:
-            """Get specific agent details."""
+        @self.app.get("/api/agents/{agent_id}", response_model=AgentResponse, responses={404: {"model": ErrorResponse}})
+        async def get_agent(agent_id: str) -> AgentResponse:
+            """Get specific agent details by ID."""
             if agent_id not in self._active_agents:
                 raise HTTPException(status_code=404, detail="Agent not found")
-            return self._active_agents[agent_id]
+            a = self._active_agents[agent_id]
+            return AgentResponse(
+                id=a["id"],
+                name=a.get("name", "unknown"),
+                role=a.get("role", "worker"),
+                state=AgentStateEnum(a.get("state", "running")),
+                joined_at=datetime.fromisoformat(a["joined_at"]) if isinstance(a.get("joined_at"), str) else datetime.now(),
+                capabilities=a.get("capabilities", []),
+            )
 
-        @self.app.post("/api/agents/{agent_id}/cancel")
-        async def cancel_agent(agent_id: str) -> dict[str, str]:
-            """Cancel an agent."""
+        @self.app.post("/api/agents/{agent_id}/cancel", response_model=AgentCancelResponse, responses={404: {"model": ErrorResponse}})
+        async def cancel_agent(agent_id: str) -> AgentCancelResponse:
+            """Cancel a running agent by ID."""
             if agent_id not in self._active_agents:
                 raise HTTPException(status_code=404, detail="Agent not found")
             # In a real implementation, this would cancel the agent
-            return {"status": "cancelled", "agent_id": agent_id}
+            return AgentCancelResponse(status="cancelled", agent_id=agent_id)
 
-        @self.app.get("/api/topology")
-        async def get_topology() -> dict[str, Any]:
-            """Get current topology."""
+        @self.app.get("/api/topology", response_model=TopologyResponse)
+        async def get_topology() -> TopologyResponse:
+            """Get current topology state including agents and recent history."""
             topology = self._get_current_topology()
-            return {
-                "current": topology,
-                "agents": [
-                    {"id": a["id"], "role": a.get("role", "worker")}
+            return TopologyResponse(
+                current=TopologyTypeEnum(topology),
+                agents=[
+                    TopologyAgentInfo(id=a["id"], role=a.get("role", "worker"))
                     for a in self._active_agents.values()
                 ],
-                "history": self._topology_history[-10:],
-            }
+                history=[
+                    TopologyHistoryEntry(
+                        from_type=TopologyTypeEnum(h["from"]) if h.get("from") else None,
+                        to_type=TopologyTypeEnum(h["to"]),
+                        timestamp=datetime.fromisoformat(h["timestamp"]) if isinstance(h.get("timestamp"), str) else datetime.now(),
+                    )
+                    for h in self._topology_history[-10:]
+                ],
+            )
 
-        @self.app.post("/api/topology/switch/{topology_type}")
-        async def switch_topology(topology_type: str) -> dict[str, Any]:
-            """Switch to a different topology."""
-            valid_types = ["swarm", "hierarchy", "pipeline", "mesh", "ring", "star"]
-            if topology_type not in valid_types:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Invalid topology type. Valid types: {valid_types}",
-                )
+        @self.app.post("/api/topology/switch/{topology_type}", response_model=TopologySwitchResponse, responses={400: {"model": ErrorResponse}})
+        async def switch_topology(topology_type: TopologyTypeEnum) -> TopologySwitchResponse:
+            """Switch to a different topology type. Migrates all agents to the new topology."""
+            import time
+            start_time = time.time()
 
             if self.topology_engine:
                 try:
-                    await self.topology_engine.switch_topology(topology_type)
-                    return {"status": "success", "new_topology": topology_type}
+                    await self.topology_engine.switch_topology(topology_type.value)
+                    duration_ms = (time.time() - start_time) * 1000
+                    return TopologySwitchResponse(
+                        status="success",
+                        new_topology=topology_type,
+                        agent_count=len(self._active_agents),
+                        duration_ms=duration_ms,
+                    )
                 except Exception as e:
                     raise HTTPException(status_code=500, detail=str(e))
             else:
                 # Mock response
                 self._topology_history.append({
                     "from": self._get_current_topology(),
-                    "to": topology_type,
+                    "to": topology_type.value,
                     "timestamp": datetime.now().isoformat(),
                 })
-                return {"status": "success", "new_topology": topology_type}
+                duration_ms = (time.time() - start_time) * 1000
+                return TopologySwitchResponse(
+                    status="success",
+                    new_topology=topology_type,
+                    agent_count=len(self._active_agents),
+                    duration_ms=duration_ms,
+                )
 
         @self.app.get("/api/events")
         async def get_events(limit: int = 50) -> list[dict[str, Any]]:
@@ -257,15 +307,14 @@ class TitanDashboard:
                 return [e.to_dict() for e in events]
             return []
 
-        @self.app.get("/api/learning/stats")
-        async def get_learning_stats() -> dict[str, Any]:
-            """Get learning statistics."""
+        @self.app.get("/api/learning/stats", response_model=LearningStatsResponse)
+        async def get_learning_stats() -> LearningStatsResponse:
+            """Get episodic learning statistics including per-topology performance."""
             # This would integrate with the EpisodicLearner
-            return {
-                "total_episodes": 0,
-                "topologies": {},
-                "message": "Integrate with EpisodicLearner for real stats",
-            }
+            return LearningStatsResponse(
+                total_episodes=0,
+                topologies={},
+            )
 
         @self.app.get("/api/metrics")
         async def get_metrics() -> str:

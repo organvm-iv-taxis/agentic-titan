@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "titan": {
+      "command": "python",
+      "args": ["-m", "mcp.server"],
+      "cwd": "/path/to/agentic-titan",
+      "env": {
+        "ANTHROPIC_API_KEY": "${env:ANTHROPIC_API_KEY}",
+        "OPENAI_API_KEY": "${env:OPENAI_API_KEY}",
+        "TITAN_LOG_LEVEL": "INFO",
+        "TITAN_METRICS_ENABLED": "false"
+      }
+    }
+  }
+}
