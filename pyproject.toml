@@ -52,8 +52,28 @@ metrics = [
 stress = [
     "psutil>=5.9.0",
 ]
+# Phase 2: Document tools
+documents = [
+    "python-docx>=1.1.0",
+    "openpyxl>=3.1.0",
+    "python-pptx>=0.6.0",
+    "pypdf>=4.0.0",
+]
+# Phase 4: Langfuse observability
+langfuse = [
+    "langfuse>=2.0.0",
+]
+# Phase 4: Language Server Protocol for semantic code
+lsp = [
+    "pygls>=1.0.0",
+]
+# Phase 4: SQL-native memory (Memori pattern)
+memori = [
+    "sqlalchemy>=2.0.0",
+    "aiosqlite>=0.19.0",
+]
 all = [
-    "agentic-titan[local-llm,vector-db,messaging,embeddings,dashboard,metrics,stress]",
+    "agentic-titan[local-llm,vector-db,messaging,embeddings,dashboard,metrics,stress,documents,langfuse,lsp,memori]",
 ]
 
 [project.scripts]

@@ -42,6 +42,10 @@ class LLMConfig:
     timeout: float = 60.0
     context_window: int = 8192
 
+    # Prompt caching configuration
+    enable_prompt_caching: bool = True
+    cache_control_type: str = "ephemeral"  # Anthropic cache control type
+
 
 @dataclass
 class LLMMessage:
@@ -66,9 +70,21 @@ class LLMResponse:
     tool_calls: list[dict[str, Any]] = field(default_factory=list)
     raw_response: Any = None
 
+    # Prompt caching metrics
+    cache_creation_input_tokens: int = 0
+    cache_read_input_tokens: int = 0
+
     @property
     def total_tokens(self) -> int:
         return self.usage.get("total_tokens", 0)
+
+    @property
+    def cache_hit_ratio(self) -> float:
+        """Calculate cache hit ratio (0.0 to 1.0)."""
+        total_cache = self.cache_creation_input_tokens + self.cache_read_input_tokens
+        if total_cache == 0:
+            return 0.0
+        return self.cache_read_input_tokens / total_cache
 
 
 @dataclass
@@ -310,7 +326,7 @@ class OllamaAdapter(LLMAdapter):
 
 
 class AnthropicAdapter(LLMAdapter):
-    """Adapter for Anthropic Claude API."""
+    """Adapter for Anthropic Claude API with prompt caching support."""
 
     provider = LLMProvider.ANTHROPIC
 
@@ -320,6 +336,64 @@ class AnthropicAdapter(LLMAdapter):
             import os
 
             config.api_key = os.environ.get("ANTHROPIC_API_KEY")  # allow-secret
+
+    def _apply_cache_control(
+        self,
+        messages: list[dict[str, Any]],
+        system: str | None,
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]] | str]:
+        """
+        Apply cache control to messages for prompt caching.
+
+        The cache_control is applied to the last user message content block,
+        which tells Anthropic to cache all content up to that point.
+
+        Returns:
+            Tuple of (modified_messages, system_content)
+        """
+        if not self.config.enable_prompt_caching:
+            return messages, system or ""
+
+        # Process system message with cache control if large enough
+        system_content: list[dict[str, Any]] | str = system or ""
+        if system and len(system) > 1024:  # Only cache substantial system prompts
+            system_content = [
+                {
+                    "type": "text",
+                    "text": system,
+                    "cache_control": {"type": self.config.cache_control_type},
+                }
+            ]
+
+        # Apply cache control to last user message
+        if messages:
+            modified_messages = []
+            for i, msg in enumerate(messages):
+                if i == len(messages) - 1 and msg["role"] == "user":
+                    # Last user message - apply cache control
+                    content = msg["content"]
+                    if isinstance(content, str):
+                        modified_messages.append({
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": content,
+                                    "cache_control": {
+                                        "type": self.config.cache_control_type
+                                    },
+                                }
+                            ],
+                        })
+                    else:
+                        # Already structured content
+                        modified_messages.append(msg)
+                else:
+                    modified_messages.append(msg)
+
+            return modified_messages, system_content
+
+        return messages, system_content
 
     async def complete(
         self,
@@ -339,6 +413,11 @@ class AnthropicAdapter(LLMAdapter):
         for msg in messages:
             anthropic_messages.append({"role": msg.role, "content": msg.content})
 
+        # Apply prompt caching
+        anthropic_messages, system_content = self._apply_cache_control(
+            anthropic_messages, system
+        )
+
         # Convert tools
         anthropic_tools = None
         if tools:
@@ -351,14 +430,20 @@ class AnthropicAdapter(LLMAdapter):
                 for t in tools
             ]
 
-        response = await client.messages.create(
-            model=self.config.model,
-            messages=anthropic_messages,
-            system=system or "",
-            max_tokens=max_tokens or self.config.max_tokens,
-            temperature=temperature or self.config.temperature,
-            tools=anthropic_tools,
-        )
+        # Build request kwargs
+        request_kwargs: dict[str, Any] = {
+            "model": self.config.model,
+            "messages": anthropic_messages,
+            "max_tokens": max_tokens or self.config.max_tokens,
+            "temperature": temperature or self.config.temperature,
+        }
+
+        if system_content:
+            request_kwargs["system"] = system_content
+        if anthropic_tools:
+            request_kwargs["tools"] = anthropic_tools
+
+        response = await client.messages.create(**request_kwargs)
 
         # Extract content
         content = ""
@@ -375,6 +460,10 @@ class AnthropicAdapter(LLMAdapter):
                     }
                 )
 
+        # Extract cache metrics
+        cache_creation = getattr(response.usage, "cache_creation_input_tokens", 0) or 0
+        cache_read = getattr(response.usage, "cache_read_input_tokens", 0) or 0
+
         return LLMResponse(
             content=content,
             model=self.config.model,
@@ -388,6 +477,8 @@ class AnthropicAdapter(LLMAdapter):
             },
             tool_calls=tool_calls,
             raw_response=response,
+            cache_creation_input_tokens=cache_creation,
+            cache_read_input_tokens=cache_read,
         )
 
     async def stream(

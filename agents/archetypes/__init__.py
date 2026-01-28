@@ -6,16 +6,19 @@ Available archetypes:
 - Researcher: Gathers and analyzes information
 - Coder: Writes and tests code
 - Reviewer: Reviews work for quality
+- Paper2Code: Converts research papers to implementations
 """
 
 from agents.archetypes.orchestrator import OrchestratorAgent
 from agents.archetypes.researcher import ResearcherAgent
 from agents.archetypes.coder import CoderAgent
 from agents.archetypes.reviewer import ReviewerAgent
+from agents.archetypes.paper2code import Paper2CodeAgent
 
 __all__ = [
     "OrchestratorAgent",
     "ResearcherAgent",
     "CoderAgent",
     "ReviewerAgent",
+    "Paper2CodeAgent",
 ]
