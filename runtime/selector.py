@@ -6,12 +6,15 @@ Automatically chooses the best runtime based on:
 - Scale requirements (instances, auto-scaling)
 - Cost optimization preferences
 - Fault tolerance needs
+- System load awareness (CPU, memory utilization)
 """
 
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+import os
+from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum
 from typing import Any
 
@@ -37,6 +40,99 @@ class SelectionStrategy(str, Enum):
     PREFER_DOCKER = "docker"   # Prefer Docker containers
     COST_OPTIMIZED = "cost"    # Minimize resource usage
     PERFORMANCE = "perf"       # Maximum performance
+    LOAD_AWARE = "load_aware"  # Select based on system load
+
+
+class LoadLevel(str, Enum):
+    """System load level classification."""
+
+    LOW = "low"
+    MODERATE = "moderate"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+
+@dataclass
+class SystemLoad:
+    """Current system resource utilization."""
+
+    cpu_percent: float = 0.0
+    memory_percent: float = 0.0
+    disk_percent: float = 0.0
+    load_average_1m: float = 0.0
+    load_average_5m: float = 0.0
+    load_average_15m: float = 0.0
+    timestamp: datetime = field(default_factory=datetime.now)
+
+    @property
+    def level(self) -> LoadLevel:
+        """Classify current load level."""
+        if self.cpu_percent > 90 or self.memory_percent > 90:
+            return LoadLevel.CRITICAL
+        if self.cpu_percent > 80 or self.memory_percent > 85:
+            return LoadLevel.HIGH
+        if self.cpu_percent > 50 or self.memory_percent > 60:
+            return LoadLevel.MODERATE
+        return LoadLevel.LOW
+
+    @property
+    def should_offload(self) -> bool:
+        """Whether tasks should be offloaded to remote workers."""
+        return self.level in (LoadLevel.HIGH, LoadLevel.CRITICAL)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary."""
+        return {
+            "cpu_percent": round(self.cpu_percent, 1),
+            "memory_percent": round(self.memory_percent, 1),
+            "disk_percent": round(self.disk_percent, 1),
+            "load_average_1m": round(self.load_average_1m, 2),
+            "load_average_5m": round(self.load_average_5m, 2),
+            "load_average_15m": round(self.load_average_15m, 2),
+            "level": self.level.value,
+            "should_offload": self.should_offload,
+            "timestamp": self.timestamp.isoformat(),
+        }
+
+
+def get_system_load() -> SystemLoad:
+    """
+    Get current system resource utilization.
+
+    Uses psutil if available, falls back to os.getloadavg().
+    """
+    try:
+        import psutil
+
+        cpu_percent = psutil.cpu_percent(interval=0.1)
+        memory = psutil.virtual_memory()
+        disk = psutil.disk_usage("/")
+        load_avg = os.getloadavg()
+
+        return SystemLoad(
+            cpu_percent=cpu_percent,
+            memory_percent=memory.percent,
+            disk_percent=disk.percent,
+            load_average_1m=load_avg[0],
+            load_average_5m=load_avg[1],
+            load_average_15m=load_avg[2],
+        )
+
+    except ImportError:
+        # psutil not installed
+        load_avg = os.getloadavg()
+        # Estimate CPU from load average (rough approximation)
+        cpu_count = os.cpu_count() or 1
+        cpu_estimate = min(100, (load_avg[0] / cpu_count) * 100)
+
+        return SystemLoad(
+            cpu_percent=cpu_estimate,
+            memory_percent=50.0,  # Unknown
+            disk_percent=50.0,  # Unknown
+            load_average_1m=load_avg[0],
+            load_average_5m=load_avg[1],
+            load_average_15m=load_avg[2],
+        )
 
 
 @dataclass
@@ -55,16 +151,31 @@ class RuntimeSelector:
 
     Analyzes constraints and task requirements to select
     the optimal runtime for agent execution.
+
+    Features:
+    - Load-aware selection based on CPU/memory utilization
+    - Automatic offloading to Docker/K3s under high load
+    - Strategy-based selection (auto, prefer_local, load_aware, etc.)
     """
 
     def __init__(
         self,
         strategy: SelectionStrategy = SelectionStrategy.AUTO,
         runtimes: dict[RuntimeType, Runtime] | None = None,
+        load_threshold_cpu: float = 80.0,
+        load_threshold_memory: float = 85.0,
     ) -> None:
         self.strategy = strategy
         self._runtimes: dict[RuntimeType, Runtime] = runtimes or {}
         self._initialized = False
+
+        # Load thresholds for offloading
+        self._load_threshold_cpu = load_threshold_cpu
+        self._load_threshold_memory = load_threshold_memory
+
+        # Cache system load (refresh every 5 seconds)
+        self._cached_load: SystemLoad | None = None
+        self._load_cache_time: datetime | None = None
 
     async def initialize(self) -> None:
         """Initialize available runtimes."""
@@ -97,6 +208,32 @@ class RuntimeSelector:
                 logger.warning(f"Error shutting down runtime: {e}")
 
         self._initialized = False
+
+    def get_system_load(self, refresh: bool = False) -> SystemLoad:
+        """
+        Get current system load with caching.
+
+        Args:
+            refresh: Force refresh of cached value
+
+        Returns:
+            Current SystemLoad
+        """
+        now = datetime.now()
+
+        # Check cache (5 second TTL)
+        if (
+            not refresh
+            and self._cached_load
+            and self._load_cache_time
+            and (now - self._load_cache_time).total_seconds() < 5.0
+        ):
+            return self._cached_load
+
+        # Refresh cache
+        self._cached_load = get_system_load()
+        self._load_cache_time = now
+        return self._cached_load
 
     def select(
         self,
@@ -135,6 +272,54 @@ class RuntimeSelector:
         # Fallback to local
         logger.warning("No suitable runtime found, falling back to local")
         return RuntimeType.LOCAL
+
+    def select_with_load_awareness(
+        self,
+        constraints: RuntimeConstraints | None = None,
+        agent_spec: dict[str, Any] | None = None,
+    ) -> tuple[RuntimeType, SystemLoad]:
+        """
+        Select runtime with load awareness.
+
+        Adjusts constraints based on current system load to
+        automatically offload to Docker/K3s when local is under pressure.
+
+        Args:
+            constraints: Runtime constraints
+            agent_spec: Agent specification
+
+        Returns:
+            Tuple of (selected runtime, current system load)
+        """
+        constraints = constraints or RuntimeConstraints()
+        system_load = self.get_system_load()
+
+        # Adjust constraints based on load
+        if system_load.cpu_percent > self._load_threshold_cpu:
+            logger.info(
+                f"High CPU load ({system_load.cpu_percent:.1f}%), "
+                "preferring non-local runtime"
+            )
+            constraints.prefer_local = False
+
+        if system_load.memory_percent > self._load_threshold_memory:
+            logger.info(
+                f"High memory pressure ({system_load.memory_percent:.1f}%), "
+                "requiring isolation"
+            )
+            constraints.needs_isolation = True
+
+        # Use load-aware strategy
+        original_strategy = self.strategy
+        if system_load.should_offload:
+            self.strategy = SelectionStrategy.PREFER_DOCKER
+
+        try:
+            runtime_type = self.select(constraints, agent_spec)
+        finally:
+            self.strategy = original_strategy
+
+        return runtime_type, system_load
 
     def _score_runtimes(
         self,
@@ -289,6 +474,19 @@ class RuntimeSelector:
             # Local is fastest for simple tasks
             if runtime_type == RuntimeType.LOCAL and not constraints.needs_isolation:
                 score += 15
+        elif self.strategy == SelectionStrategy.LOAD_AWARE:
+            # Apply load-based modifiers
+            system_load = self.get_system_load()
+            if system_load.should_offload:
+                # Prefer Docker under high load
+                if runtime_type == RuntimeType.DOCKER:
+                    score += 25
+                elif runtime_type == RuntimeType.LOCAL:
+                    score -= 20
+            else:
+                # Prefer local under low load
+                if runtime_type == RuntimeType.LOCAL:
+                    score += 10
 
         return score
 
@@ -390,4 +588,22 @@ class RuntimeSelector:
                 "auto_scale": constraints.auto_scale,
                 "cost_sensitive": constraints.cost_sensitive,
             },
+            "system_load": self.get_system_load().to_dict(),
         }
+
+
+# =============================================================================
+# Factory Functions
+# =============================================================================
+
+_default_selector: RuntimeSelector | None = None
+
+
+def get_runtime_selector() -> RuntimeSelector:
+    """Get the default runtime selector instance."""
+    global _default_selector
+    if _default_selector is None:
+        _default_selector = RuntimeSelector(
+            strategy=SelectionStrategy.LOAD_AWARE,
+        )
+    return _default_selector

@@ -1,0 +1,330 @@
+# Titan Batch - Celery Worker Kubernetes Deployment
+#
+# Deploys Celery workers for distributed batch processing.
+# Includes HorizontalPodAutoscaler for automatic scaling.
+#
+# Usage:
+#   kubectl apply -f celery-worker.yaml
+#   kubectl get pods -l app=titan-celery-worker
+#   kubectl logs -l app=titan-celery-worker -f
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: titan-celery-config
+  namespace: titan
+  labels:
+    app: titan-celery-worker
+data:
+  CELERY_BROKER_URL: "redis://titan-redis:6379/1"
+  CELERY_RESULT_BACKEND: "redis://titan-redis:6379/2"
+  WORKER_RUNTIME_TYPE: "k3s"
+  TITAN_LOG_LEVEL: "INFO"
+  CELERY_WORKER_CONCURRENCY: "3"
+  # S3/MinIO settings
+  TITAN_S3_ENDPOINT: "http://titan-minio:9000"
+  TITAN_S3_BUCKET: "titan-artifacts"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: titan-celery-secrets
+  namespace: titan
+  labels:
+    app: titan-celery-worker
+type: Opaque
+stringData:
+  AWS_ACCESS_KEY_ID: "titan"
+  AWS_SECRET_ACCESS_KEY: "titan-secret"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: titan-celery-worker
+  namespace: titan
+  labels:
+    app: titan-celery-worker
+    component: batch
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: titan-celery-worker
+  template:
+    metadata:
+      labels:
+        app: titan-celery-worker
+        component: batch
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9100"
+    spec:
+      containers:
+        - name: worker
+          image: titan/worker:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - celery
+            - -A
+            - titan.batch.celery_app
+            - worker
+            - --loglevel=INFO
+            - --concurrency=3
+          envFrom:
+            - configMapRef:
+                name: titan-celery-config
+            - secretRef:
+                name: titan-celery-secrets
+          env:
+            - name: CELERY_WORKER_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
+          livenessProbe:
+            exec:
+              command:
+                - celery
+                - -A
+                - titan.batch.celery_app
+                - inspect
+                - ping
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - celery
+                - -A
+                - titan.batch.celery_app
+                - inspect
+                - ping
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 300  # Allow tasks to complete
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: titan-celery-worker-hpa
+  namespace: titan
+  labels:
+    app: titan-celery-worker
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: titan-celery-worker
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    # Scale based on CPU utilization
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    # Scale based on memory utilization
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300  # Wait 5 min before scaling down
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Pods
+          value: 2
+          periodSeconds: 30
+
+---
+# Celery Beat - Periodic Task Scheduler (single instance)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: titan-celery-beat
+  namespace: titan
+  labels:
+    app: titan-celery-beat
+    component: batch
+spec:
+  replicas: 1  # Only one beat instance
+  selector:
+    matchLabels:
+      app: titan-celery-beat
+  template:
+    metadata:
+      labels:
+        app: titan-celery-beat
+        component: batch
+    spec:
+      containers:
+        - name: beat
+          image: titan/worker:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - celery
+            - -A
+            - titan.batch.celery_app
+            - beat
+            - --loglevel=INFO
+          envFrom:
+            - configMapRef:
+                name: titan-celery-config
+            - secretRef:
+                name: titan-celery-secrets
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "100m"
+      restartPolicy: Always
+
+---
+# Flower - Celery Monitoring Dashboard
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: titan-flower
+  namespace: titan
+  labels:
+    app: titan-flower
+    component: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: titan-flower
+  template:
+    metadata:
+      labels:
+        app: titan-flower
+        component: monitoring
+    spec:
+      containers:
+        - name: flower
+          image: mher/flower:latest
+          ports:
+            - containerPort: 5555
+          env:
+            - name: CELERY_BROKER_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: titan-celery-config
+                  key: CELERY_BROKER_URL
+            - name: FLOWER_BASIC_AUTH
+              value: "admin:titan"
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+          livenessProbe:
+            httpGet:
+              path: /healthcheck
+              port: 5555
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /healthcheck
+              port: 5555
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      restartPolicy: Always
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: titan-flower
+  namespace: titan
+  labels:
+    app: titan-flower
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5555
+      targetPort: 5555
+      name: http
+  selector:
+    app: titan-flower
+
+---
+# Optional: Ingress for Flower dashboard
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: titan-flower-ingress
+  namespace: titan
+  annotations:
+    kubernetes.io/ingress.class: traefik
+spec:
+  rules:
+    - host: flower.titan.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: titan-flower
+                port:
+                  number: 5555
+
+---
+# PodDisruptionBudget - ensure availability during updates
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: titan-celery-worker-pdb
+  namespace: titan
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: titan-celery-worker
+
+---
+# Custom metrics for queue-based scaling (requires Prometheus adapter)
+# apiVersion: v1
+# kind: ConfigMap
+# metadata:
+#   name: celery-queue-metrics
+#   namespace: titan
+# data:
+#   config.yaml: |
+#     rules:
+#       - seriesQuery: 'celery_queue_length{queue="titan.batch.inquiry"}'
+#         resources:
+#           overrides:
+#             namespace: {resource: "namespace"}
+#         name:
+#           as: "celery_queue_depth"
+#         metricsQuery: 'sum(celery_queue_length{queue="titan.batch.inquiry"})'

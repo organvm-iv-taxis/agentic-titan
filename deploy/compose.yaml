@@ -1,9 +1,13 @@
 # Agentic Titan - Docker Compose Configuration
 #
 # Services:
-# - redis: Working memory and pub/sub
+# - redis: Working memory, pub/sub, and Celery broker
 # - chromadb: Vector store for long-term memory
 # - nats: High-performance messaging (optional)
+# - minio: S3-compatible artifact storage
+# - celery-worker: Distributed batch processing workers
+# - celery-beat: Periodic task scheduler
+# - flower: Celery monitoring dashboard
 # - prometheus: Metrics collection
 # - grafana: Metrics visualization
 # - titan-api: Main API gateway with metrics endpoint
@@ -11,6 +15,7 @@
 # Usage:
 #   docker compose up -d redis chromadb           # Minimal setup
 #   docker compose up -d                           # Core services
+#   docker compose --profile batch up -d           # With batch processing
 #   docker compose --profile monitoring up -d      # With observability
 #   docker compose --profile full up -d            # Everything
 
@@ -187,12 +192,126 @@ services:
       - TITAN_REDIS_URL=redis://redis:6379
       - TITAN_CHROMADB_URL=http://chromadb:8000
       - TITAN_LOG_LEVEL=INFO
+      - CELERY_BROKER_URL=redis://redis:6379/1
     depends_on:
       redis:
         condition: service_healthy
     restart: unless-stopped
     profiles:
       - api
+
+  # ============================================================================
+  # Batch Processing Services
+  # ============================================================================
+
+  # MinIO - S3-compatible artifact storage
+  minio:
+    image: minio/minio:latest
+    container_name: titan-minio
+    ports:
+      - "9000:9000"    # S3 API
+      - "9001:9001"    # Web console
+    volumes:
+      - minio-data:/data
+    environment:
+      - MINIO_ROOT_USER=titan
+      - MINIO_ROOT_PASSWORD=titan-secret
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    profiles:
+      - batch
+      - full
+
+  # MinIO setup - creates default bucket
+  minio-setup:
+    image: minio/mc:latest
+    container_name: titan-minio-setup
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set titan http://minio:9000 titan titan-secret;
+      mc mb -p titan/titan-artifacts;
+      mc anonymous set download titan/titan-artifacts;
+      exit 0;
+      "
+    profiles:
+      - batch
+      - full
+
+  # Celery Worker - batch processing
+  celery-worker:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.worker
+    container_name: titan-celery-worker
+    command: celery -A titan.batch.celery_app worker --loglevel=INFO --concurrency=3
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+      - WORKER_RUNTIME_TYPE=docker
+      - TITAN_S3_ENDPOINT=http://minio:9000
+      - TITAN_S3_BUCKET=titan-artifacts
+      - AWS_ACCESS_KEY_ID=titan
+      - AWS_SECRET_ACCESS_KEY=titan-secret
+      - TITAN_REDIS_URL=redis://redis:6379
+      - TITAN_LOG_LEVEL=INFO
+    depends_on:
+      redis:
+        condition: service_healthy
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+    restart: unless-stopped
+    profiles:
+      - batch
+      - full
+
+  # Celery Beat - periodic task scheduler
+  celery-beat:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.worker
+    container_name: titan-celery-beat
+    command: celery -A titan.batch.celery_app beat --loglevel=INFO
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    profiles:
+      - batch
+      - full
+
+  # Flower - Celery monitoring
+  flower:
+    image: mher/flower:latest
+    container_name: titan-flower
+    ports:
+      - "5555:5555"
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - FLOWER_BASIC_AUTH=admin:titan
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    profiles:
+      - batch
+      - monitoring
+      - full
 
 volumes:
   redis-data:
@@ -201,6 +320,7 @@ volumes:
   prometheus-data:
   grafana-data:
   ollama-data:
+  minio-data:
 
 networks:
   default:
