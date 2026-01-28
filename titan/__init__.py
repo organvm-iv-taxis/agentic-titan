@@ -6,6 +6,14 @@ A model-agnostic, polyglot, self-organizing multi-agent system that:
 - Deploys across local, container, and serverless runtimes dynamically
 - Shares a collective intelligence layer (Hive Mind)
 - Scales from 2 to 100+ agents
+
+Sub-packages:
+- titan.core: Project context loading (TITAN.md)
+- titan.memory: Pluggable memory backends (ChromaDB, Memori)
+- titan.persistence: State checkpointing
+- titan.observability: Langfuse tracing
+- titan.learning: Local style learning
+- titan.tools: Advanced tools (Image Gen, M365)
 """
 
 from titan.spec import AgentSpec, SpecRegistry
