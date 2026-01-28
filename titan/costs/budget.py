@@ -2,6 +2,11 @@
 Titan Costs - Budget Tracking
 
 Provides budget management and spend tracking.
+
+Enhanced with:
+- Integration with TokenOptimizer for accurate token estimation
+- Model-specific pricing with automatic updates
+- Cost projection based on remaining work
 """
 
 from __future__ import annotations
@@ -11,8 +16,11 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
+
+if TYPE_CHECKING:
+    from titan.prompts.token_optimizer import TokenOptimizer
 
 logger = logging.getLogger("titan.costs.budget")
 
@@ -144,10 +152,17 @@ class BudgetTracker:
     - Daily/monthly aggregate limits
     - Alert thresholds
     - Redis persistence for distributed tracking
+    - Integration with TokenOptimizer for accurate estimation
+    - Cost projection for remaining work
     """
 
-    def __init__(self, config: BudgetConfig | None = None) -> None:
+    def __init__(
+        self,
+        config: BudgetConfig | None = None,
+        token_optimizer: "TokenOptimizer | None" = None,
+    ) -> None:
         self.config = config or BudgetConfig()
+        self._token_optimizer = token_optimizer
         self._budgets: dict[str, Budget] = {}  # session_id -> Budget
         self._agent_budgets: dict[str, Budget] = {}  # agent_id -> Budget
         self._spend_history: list[SpendRecord] = []
@@ -157,6 +172,32 @@ class BudgetTracker:
         self._monthly_reset: datetime = datetime.utcnow()
         self._lock = asyncio.Lock()
         self._alert_callbacks: list[Any] = []
+
+        # Extended pricing table with more models
+        self._pricing = {
+            # Anthropic (input, output per 1K tokens)
+            "claude-3-opus": (0.015, 0.075),
+            "claude-opus-4": (0.015, 0.075),
+            "claude-3-5-sonnet": (0.003, 0.015),
+            "claude-sonnet-4": (0.003, 0.015),
+            "claude-3-sonnet": (0.003, 0.015),
+            "claude-3-haiku": (0.00025, 0.00125),
+            "claude-3-5-haiku": (0.001, 0.005),
+            # OpenAI
+            "gpt-4-turbo": (0.01, 0.03),
+            "gpt-4o": (0.005, 0.015),
+            "gpt-4o-mini": (0.00015, 0.0006),
+            "gpt-3.5-turbo": (0.0005, 0.0015),
+            "o1": (0.015, 0.06),
+            "o1-mini": (0.003, 0.012),
+            # Groq (approximately)
+            "llama-3-70b": (0.0007, 0.0008),
+            "llama-3-8b": (0.0001, 0.0002),
+            "mixtral-8x7b": (0.0005, 0.0005),
+            # Google
+            "gemini-1.5-pro": (0.00125, 0.005),
+            "gemini-1.5-flash": (0.000075, 0.0003),
+        }
 
     async def create_session_budget(
         self,
@@ -388,30 +429,110 @@ class BudgetTracker:
         Returns:
             Estimated cost in USD
         """
-        # Model-specific pricing (per 1K tokens)
-        pricing = {
-            # Anthropic
-            "claude-3-opus": (0.015, 0.075),
-            "claude-3-sonnet": (0.003, 0.015),
-            "claude-3-haiku": (0.00025, 0.00125),
-            # OpenAI
-            "gpt-4-turbo": (0.01, 0.03),
-            "gpt-4o": (0.005, 0.015),
-            "gpt-4o-mini": (0.00015, 0.0006),
-            "gpt-3.5-turbo": (0.0005, 0.0015),
-            # Groq (approximately)
-            "llama-70b": (0.0007, 0.0008),
-            "mixtral-8x7b": (0.0005, 0.0005),
-        }
+        # Find matching pricing (try exact match, then partial)
+        model_lower = model.lower()
+        input_price, output_price = None, None
 
-        # Find matching pricing
-        input_price, output_price = pricing.get(
-            model,
-            (self.config.default_cost_per_1k_tokens, self.config.default_cost_per_1k_tokens)
-        )
+        # Exact match first
+        if model_lower in self._pricing:
+            input_price, output_price = self._pricing[model_lower]
+        else:
+            # Partial match
+            for price_model, prices in self._pricing.items():
+                if price_model in model_lower or model_lower in price_model:
+                    input_price, output_price = prices
+                    break
+
+        # Default pricing if no match
+        if input_price is None:
+            input_price = self.config.default_cost_per_1k_tokens
+            output_price = self.config.default_cost_per_1k_tokens
 
         cost = (input_tokens / 1000 * input_price) + (output_tokens / 1000 * output_price)
         return cost
+
+    async def estimate_cost_for_text(
+        self,
+        input_text: str,
+        expected_output_tokens: int,
+        model: str,
+    ) -> float:
+        """
+        Estimate cost for text using token optimizer.
+
+        Args:
+            input_text: Input text to estimate
+            expected_output_tokens: Expected output tokens
+            model: Model to use
+
+        Returns:
+            Estimated cost in USD
+        """
+        if self._token_optimizer:
+            estimate = self._token_optimizer.estimate_tokens(input_text, model)
+            input_tokens = estimate.estimated_tokens
+        else:
+            # Rough estimate: ~4 chars per token
+            input_tokens = len(input_text) // 4
+
+        return await self.estimate_cost(input_tokens, expected_output_tokens, model)
+
+    async def project_session_cost(
+        self,
+        session_id: str,
+        remaining_stages: int,
+        model: str = "claude-3-5-sonnet",
+        concise_mode: bool = False,
+    ) -> dict[str, float]:
+        """
+        Project total cost for remaining session work.
+
+        Args:
+            session_id: Session ID
+            remaining_stages: Number of stages remaining
+            model: Expected model to use
+            concise_mode: Whether concise prompts will be used
+
+        Returns:
+            Dict with projected costs
+        """
+        # Average tokens per stage (based on typical usage)
+        if concise_mode:
+            avg_input_tokens = 800
+            avg_output_tokens = 300
+        else:
+            avg_input_tokens = 2000
+            avg_output_tokens = 600
+
+        # Get current spend
+        budget = self._budgets.get(session_id)
+        current_spend = budget.spent_usd if budget else 0.0
+
+        # Project remaining cost
+        per_stage_cost = await self.estimate_cost(
+            avg_input_tokens,
+            avg_output_tokens,
+            model,
+        )
+        projected_remaining = per_stage_cost * remaining_stages
+        projected_total = current_spend + projected_remaining
+
+        return {
+            "current_spend": current_spend,
+            "projected_remaining": projected_remaining,
+            "projected_total": projected_total,
+            "per_stage_estimate": per_stage_cost,
+            "remaining_stages": remaining_stages,
+        }
+
+    def set_token_optimizer(self, optimizer: "TokenOptimizer") -> None:
+        """Set the token optimizer for accurate estimation."""
+        self._token_optimizer = optimizer
+
+    def update_pricing(self, model: str, input_price: float, output_price: float) -> None:
+        """Update pricing for a model."""
+        self._pricing[model.lower()] = (input_price, output_price)
+        logger.info(f"Updated pricing for {model}: input=${input_price}/1K, output=${output_price}/1K")
 
     async def can_afford(
         self,

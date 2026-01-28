@@ -7,9 +7,16 @@ Abstract base class for all agents in the Titan swarm. Provides:
 - Topology-aware communication
 - Built-in resilience patterns
 - PostgreSQL audit logging
+- Explicit stopping conditions (Anthropic best practice)
+- Checkpointing for recovery
 
 Ported from: metasystem-core/agent_utils/base_agent.py
 Extended with: Hive Mind integration, topology awareness, async support, audit logging
+
+Based on research:
+- Anthropic: Explicit stopping conditions and human checkpoints
+- "Ground truth" environmental feedback at each step
+- Uncertainty tracking for agent decisions
 """
 
 from __future__ import annotations
@@ -32,6 +39,108 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger("titan.agent")
+
+
+# =============================================================================
+# Stopping Conditions
+# =============================================================================
+
+
+class StoppingReason(str, Enum):
+    """Reasons for stopping agent execution."""
+
+    SUCCESS = "success"  # Task completed successfully
+    FAILURE = "failure"  # Task failed (unrecoverable)
+    MAX_TURNS = "max_turns"  # Reached maximum turns
+    TIMEOUT = "timeout"  # Execution timeout
+    BUDGET_EXHAUSTED = "budget_exhausted"  # No budget remaining
+    USER_CANCELLED = "user_cancelled"  # User requested stop
+    CHECKPOINT_REQUIRED = "checkpoint_required"  # Human review needed
+    STUCK_DETECTED = "stuck_detected"  # Agent appears stuck
+    ERROR_THRESHOLD = "error_threshold"  # Too many errors
+
+
+@dataclass
+class StoppingCondition:
+    """
+    A condition that determines when an agent should stop.
+
+    Based on Anthropic's guidance: "Implement explicit stopping conditions."
+    """
+
+    reason: StoppingReason
+    check: Callable[["BaseAgent"], bool]
+    message: str = ""
+    priority: int = 0  # Higher priority checked first
+
+    def evaluate(self, agent: "BaseAgent") -> bool:
+        """Evaluate if this stopping condition is met."""
+        try:
+            return self.check(agent)
+        except Exception as e:
+            logger.warning(f"Stopping condition check failed: {e}")
+            return False
+
+
+@dataclass
+class AgentCheckpoint:
+    """
+    A checkpoint of agent state for recovery or review.
+
+    Checkpoints enable:
+    - Recovery from failures
+    - Human-in-the-loop review
+    - Audit trail of agent progress
+    """
+
+    agent_id: str
+    session_id: str
+    turn_number: int
+    timestamp: datetime = field(default_factory=datetime.now)
+    state: dict[str, Any] = field(default_factory=dict)
+    decisions_made: list[dict[str, Any]] = field(default_factory=list)
+    memory_snapshot: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for serialization."""
+        return {
+            "agent_id": self.agent_id,
+            "session_id": self.session_id,
+            "turn_number": self.turn_number,
+            "timestamp": self.timestamp.isoformat(),
+            "state": self.state,
+            "decisions_made": self.decisions_made,
+            "memory_snapshot": self.memory_snapshot,
+            "metadata": self.metadata,
+        }
+
+
+@dataclass
+class AgentDecision:
+    """
+    A tracked decision made by an agent.
+
+    Based on Anthropic's guidance for uncertainty tracking.
+    """
+
+    choice: str
+    confidence: float  # 0-1
+    uncertainty_bounds: tuple[float, float] = (0.0, 1.0)  # Low, high
+    alternatives: list[str] = field(default_factory=list)
+    rationale: str = ""
+    category: str = ""
+    timestamp: datetime = field(default_factory=datetime.now)
+
+    @property
+    def is_high_confidence(self) -> bool:
+        """Whether this is a high-confidence decision."""
+        return self.confidence >= 0.8
+
+    @property
+    def uncertainty_range(self) -> float:
+        """The range of uncertainty."""
+        return self.uncertainty_bounds[1] - self.uncertainty_bounds[0]
 
 
 class AgentState(Enum):
@@ -139,6 +248,9 @@ class BaseAgent(ABC):
         audit_logger: AuditLogger | None = None,
         max_turns: int = 20,
         timeout_ms: int = 300_000,
+        checkpoint_interval: int = 5,
+        error_threshold: int = 3,
+        stopping_conditions: list[StoppingCondition] | None = None,
     ) -> None:
         """
         Initialize agent.
@@ -152,6 +264,9 @@ class BaseAgent(ABC):
             audit_logger: Audit logger for persistent logging
             max_turns: Maximum execution turns
             timeout_ms: Execution timeout in milliseconds
+            checkpoint_interval: Turns between automatic checkpoints
+            error_threshold: Number of consecutive errors before stopping
+            stopping_conditions: Custom stopping conditions
         """
         self.agent_id = agent_id or f"{name}-{uuid.uuid4().hex[:8]}"
         self.name = name
@@ -165,18 +280,53 @@ class BaseAgent(ABC):
         # Configuration
         self.max_turns = max_turns
         self.timeout_ms = timeout_ms
+        self.checkpoint_interval = checkpoint_interval
+        self.error_threshold = error_threshold
+
+        # Stopping conditions (with defaults)
+        self._stopping_conditions = stopping_conditions or []
+        self._add_default_stopping_conditions()
 
         # State
         self._state = AgentState.CREATED
         self._context: AgentContext | None = None
         self._session_id: str | None = None
         self._decisions_logged: list[dict[str, Any]] = []
+        self._tracked_decisions: list[AgentDecision] = []
         self._last_error: Exception | None = None
+        self._consecutive_errors: int = 0
+        self._checkpoints: list[AgentCheckpoint] = []
+        self._last_checkpoint_turn: int = 0
 
         # Event handlers
         self._on_state_change: list[Callable[[AgentState, AgentState], None]] = []
+        self._on_checkpoint: list[Callable[[AgentCheckpoint], None]] = []
 
         logger.info(f"Agent '{self.name}' ({self.agent_id}) created")
+
+    def _add_default_stopping_conditions(self) -> None:
+        """Add default stopping conditions."""
+        # Max turns condition
+        self._stopping_conditions.append(StoppingCondition(
+            reason=StoppingReason.MAX_TURNS,
+            check=lambda agent: (
+                agent._context is not None and
+                agent._context.turn_number >= agent.max_turns
+            ),
+            message="Maximum turns reached",
+            priority=10,
+        ))
+
+        # Error threshold condition
+        self._stopping_conditions.append(StoppingCondition(
+            reason=StoppingReason.ERROR_THRESHOLD,
+            check=lambda agent: agent._consecutive_errors >= agent.error_threshold,
+            message="Error threshold exceeded",
+            priority=20,
+        ))
+
+        # Sort by priority
+        self._stopping_conditions.sort(key=lambda c: c.priority, reverse=True)
 
     @property
     def state(self) -> AgentState:
@@ -587,6 +737,230 @@ class BaseAgent(ABC):
             self._context.turn_number += 1
             return self._context.turn_number
         return 0
+
+    # =========================================================================
+    # Stopping Conditions & Checkpoints
+    # =========================================================================
+
+    async def should_stop(self) -> tuple[bool, StoppingReason | None, str]:
+        """
+        Check if the agent should stop execution.
+
+        Based on Anthropic's guidance: "Implement explicit stopping conditions."
+
+        Returns:
+            Tuple of (should_stop, reason, message)
+        """
+        for condition in self._stopping_conditions:
+            if condition.evaluate(self):
+                logger.info(
+                    f"Agent '{self.name}' stopping: {condition.reason.value} - {condition.message}"
+                )
+                return True, condition.reason, condition.message
+
+        return False, None, ""
+
+    def add_stopping_condition(self, condition: StoppingCondition) -> None:
+        """Add a custom stopping condition."""
+        self._stopping_conditions.append(condition)
+        self._stopping_conditions.sort(key=lambda c: c.priority, reverse=True)
+
+    async def checkpoint(self, force: bool = False) -> AgentCheckpoint | None:
+        """
+        Create a checkpoint of current agent state.
+
+        Checkpoints are created:
+        - Automatically every checkpoint_interval turns
+        - When force=True
+        - Before critical operations
+
+        Args:
+            force: Force checkpoint creation regardless of interval
+
+        Returns:
+            AgentCheckpoint if created, None otherwise
+        """
+        if not self._context:
+            return None
+
+        # Check if checkpoint is due
+        turns_since_last = self._context.turn_number - self._last_checkpoint_turn
+        if not force and turns_since_last < self.checkpoint_interval:
+            return None
+
+        checkpoint = AgentCheckpoint(
+            agent_id=self.agent_id,
+            session_id=self._session_id or "unknown",
+            turn_number=self._context.turn_number,
+            state={
+                "agent_state": self._state.value,
+                "consecutive_errors": self._consecutive_errors,
+            },
+            decisions_made=[
+                {
+                    "choice": d.choice,
+                    "confidence": d.confidence,
+                    "category": d.category,
+                }
+                for d in self._tracked_decisions[-10:]  # Last 10 decisions
+            ],
+            memory_snapshot={
+                "decisions_count": len(self._decisions_logged),
+            },
+        )
+
+        self._checkpoints.append(checkpoint)
+        self._last_checkpoint_turn = self._context.turn_number
+
+        # Notify handlers
+        for handler in self._on_checkpoint:
+            try:
+                handler(checkpoint)
+            except Exception as e:
+                logger.warning(f"Checkpoint handler error: {e}")
+
+        # Store in Hive Mind if available
+        if self._hive_mind:
+            try:
+                await self._hive_mind.set(
+                    f"checkpoint:{self.agent_id}:{self._context.turn_number}",
+                    checkpoint.to_dict(),
+                    ttl=3600 * 24,  # 24 hours
+                )
+            except Exception as e:
+                logger.warning(f"Failed to store checkpoint: {e}")
+
+        logger.debug(f"Checkpoint created at turn {self._context.turn_number}")
+        return checkpoint
+
+    def get_latest_checkpoint(self) -> AgentCheckpoint | None:
+        """Get the most recent checkpoint."""
+        return self._checkpoints[-1] if self._checkpoints else None
+
+    async def restore_from_checkpoint(
+        self,
+        checkpoint: AgentCheckpoint,
+    ) -> bool:
+        """
+        Restore agent state from a checkpoint.
+
+        Args:
+            checkpoint: Checkpoint to restore from
+
+        Returns:
+            True if restoration successful
+        """
+        try:
+            # Restore basic state
+            if self._context:
+                self._context.turn_number = checkpoint.turn_number
+
+            state = checkpoint.state
+            if "consecutive_errors" in state:
+                self._consecutive_errors = state["consecutive_errors"]
+
+            logger.info(
+                f"Agent '{self.name}' restored from checkpoint "
+                f"at turn {checkpoint.turn_number}"
+            )
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to restore from checkpoint: {e}")
+            return False
+
+    def on_checkpoint(
+        self,
+        handler: Callable[[AgentCheckpoint], None],
+    ) -> None:
+        """Register a checkpoint event handler."""
+        self._on_checkpoint.append(handler)
+
+    # =========================================================================
+    # Decision Tracking
+    # =========================================================================
+
+    def track_decision(
+        self,
+        choice: str,
+        confidence: float,
+        alternatives: list[str] | None = None,
+        rationale: str = "",
+        category: str = "",
+        uncertainty_bounds: tuple[float, float] | None = None,
+    ) -> AgentDecision:
+        """
+        Track a decision with confidence and uncertainty.
+
+        Based on Anthropic's guidance for uncertainty tracking in agents.
+
+        Args:
+            choice: The selected option
+            confidence: Confidence score (0-1)
+            alternatives: Other options considered
+            rationale: Reasoning for the decision
+            category: Decision category
+            uncertainty_bounds: Low/high confidence bounds
+
+        Returns:
+            The tracked AgentDecision
+        """
+        # Calculate default uncertainty bounds from confidence
+        if uncertainty_bounds is None:
+            margin = (1 - confidence) / 2
+            uncertainty_bounds = (
+                max(0.0, confidence - margin),
+                min(1.0, confidence + margin),
+            )
+
+        decision = AgentDecision(
+            choice=choice,
+            confidence=confidence,
+            uncertainty_bounds=uncertainty_bounds,
+            alternatives=alternatives or [],
+            rationale=rationale,
+            category=category,
+        )
+
+        self._tracked_decisions.append(decision)
+
+        # Reset consecutive errors on successful decision
+        if confidence > 0.5:
+            self._consecutive_errors = 0
+
+        logger.debug(
+            f"Decision tracked: {choice} "
+            f"(confidence={confidence:.2f}, category={category})"
+        )
+
+        return decision
+
+    def get_decision_summary(self) -> dict[str, Any]:
+        """Get summary of tracked decisions."""
+        if not self._tracked_decisions:
+            return {"count": 0}
+
+        confidences = [d.confidence for d in self._tracked_decisions]
+        categories = {}
+        for d in self._tracked_decisions:
+            categories[d.category] = categories.get(d.category, 0) + 1
+
+        return {
+            "count": len(self._tracked_decisions),
+            "avg_confidence": sum(confidences) / len(confidences),
+            "min_confidence": min(confidences),
+            "max_confidence": max(confidences),
+            "by_category": categories,
+            "high_confidence_count": sum(1 for d in self._tracked_decisions if d.is_high_confidence),
+        }
+
+    def record_error(self, error: Exception | str) -> None:
+        """Record an error occurrence for threshold tracking."""
+        self._consecutive_errors += 1
+        self._last_error = error if isinstance(error, Exception) else Exception(str(error))
+        logger.warning(
+            f"Agent '{self.name}' error #{self._consecutive_errors}: {error}"
+        )
 
     # =========================================================================
     # Audit Logging

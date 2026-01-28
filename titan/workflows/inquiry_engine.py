@@ -4,6 +4,12 @@ Titan Workflows - Inquiry Engine
 Core workflow execution engine for multi-perspective collaborative inquiry.
 Orchestrates the execution of inquiry stages with multi-model routing,
 context accumulation, and real-time progress updates.
+
+Enhanced with:
+- Context compaction via TokenOptimizer
+- Sub-agent summarization for large contexts
+- Budget-aware prompt selection
+- Prompt effectiveness tracking
 """
 
 from __future__ import annotations
@@ -24,7 +30,7 @@ from titan.workflows.inquiry_config import (
     InquiryWorkflow,
     EXPANSIVE_INQUIRY_WORKFLOW,
 )
-from titan.workflows.inquiry_prompts import get_prompt
+from titan.workflows.inquiry_prompts import get_prompt, get_prompt_with_budget_awareness
 from titan.workflows.cognitive_router import (
     CognitiveRouter,
     CognitiveTaskType,
@@ -33,6 +39,9 @@ from titan.workflows.cognitive_router import (
 
 if TYPE_CHECKING:
     from hive.memory import HiveMind
+    from titan.prompts.token_optimizer import TokenOptimizer
+    from titan.prompts.metrics import PromptTracker
+    from titan.costs.budget import BudgetTracker
 
 logger = logging.getLogger("titan.workflows.inquiry_engine")
 
@@ -121,11 +130,27 @@ class InquirySession:
         """Whether all stages have been executed."""
         return len(self.results) >= self.total_stages
 
-    def get_previous_context(self) -> str:
-        """Get accumulated context from previous stages as JSON."""
+    def get_previous_context(
+        self,
+        token_optimizer: "TokenOptimizer | None" = None,
+        max_tokens: int | None = None,
+        use_summarization: bool = True,
+    ) -> str:
+        """
+        Get accumulated context from previous stages.
+
+        Args:
+            token_optimizer: Optional optimizer for context compression
+            max_tokens: Maximum tokens for context (triggers compression)
+            use_summarization: Whether to summarize older stages
+
+        Returns:
+            Context string (JSON or summarized)
+        """
         if not self.results:
             return ""
 
+        # Build full context
         context = {}
         for result in self.results:
             context[result.stage_name] = {
@@ -134,7 +159,27 @@ class InquirySession:
                 "stage_index": result.stage_index,
             }
 
-        return json.dumps(context, indent=2)
+        full_context = json.dumps(context, indent=2)
+
+        # Compress if optimizer provided and context is large
+        if token_optimizer and max_tokens:
+            estimate = token_optimizer.estimate_tokens(full_context)
+            if estimate.estimated_tokens > max_tokens:
+                if use_summarization:
+                    # Use stage result compression
+                    return token_optimizer.compress_stage_results(
+                        [r.to_dict() for r in self.results],
+                        max_tokens_per_stage=max_tokens // max(len(self.results), 1),
+                    )
+                else:
+                    # Use general compression
+                    compression = token_optimizer.compress_context(
+                        full_context,
+                        max_tokens=max_tokens,
+                    )
+                    return compression.compressed_text
+
+        return full_context
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
@@ -161,9 +206,11 @@ class InquiryEngine:
 
     Features:
     - Multi-model routing based on cognitive task type
-    - Context accumulation between stages
+    - Context accumulation between stages with compression
     - Progress streaming via callbacks
     - Integration with Hive Mind for shared memory
+    - Budget-aware prompt selection
+    - Prompt effectiveness tracking
     """
 
     def __init__(
@@ -172,6 +219,10 @@ class InquiryEngine:
         hive_mind: HiveMind | None = None,
         llm_caller: Callable[[str, str], Any] | None = None,
         default_model: str = "claude-3-5-sonnet-20241022",
+        token_optimizer: "TokenOptimizer | None" = None,
+        prompt_tracker: "PromptTracker | None" = None,
+        budget_tracker: "BudgetTracker | None" = None,
+        max_context_tokens: int = 4000,
     ) -> None:
         """
         Initialize the inquiry engine.
@@ -181,11 +232,21 @@ class InquiryEngine:
             hive_mind: Shared memory for agents (optional)
             llm_caller: Function to call LLM (async). Signature: (prompt, model) -> response
             default_model: Fallback model when routing unavailable
+            token_optimizer: Optimizer for context compression
+            prompt_tracker: Tracker for prompt effectiveness metrics
+            budget_tracker: Tracker for budget management
+            max_context_tokens: Maximum tokens for accumulated context
         """
         self._cognitive_router = cognitive_router or get_cognitive_router()
         self._hive_mind = hive_mind
         self._llm_caller = llm_caller
         self._default_model = default_model
+
+        # Token optimization
+        self._token_optimizer = token_optimizer
+        self._prompt_tracker = prompt_tracker
+        self._budget_tracker = budget_tracker
+        self._max_context_tokens = max_context_tokens
 
         # Active sessions
         self._sessions: dict[str, InquirySession] = {}
@@ -301,8 +362,22 @@ class InquiryEngine:
         start_time = time.time()
 
         try:
-            # Build the prompt
-            prompt = self._build_stage_prompt(session, stage)
+            # Get budget info if available
+            budget_remaining = None
+            budget_total = None
+            if self._budget_tracker:
+                budget = await self._budget_tracker.get_budget(session.id)
+                if budget:
+                    budget_remaining = budget.remaining_usd
+                    budget_total = budget.allocated_usd
+
+            # Build the prompt with budget awareness
+            prompt, used_concise = self._build_stage_prompt(
+                session,
+                stage,
+                budget_remaining=budget_remaining,
+                budget_total=budget_total,
+            )
 
             # Route to appropriate model
             cognitive_type = self._style_to_cognitive_type(stage.cognitive_style)
@@ -326,6 +401,11 @@ class InquiryEngine:
 
             duration_ms = int((time.time() - start_time) * 1000)
 
+            # Estimate prompt tokens
+            prompt_tokens = 0
+            if self._token_optimizer:
+                prompt_tokens = self._token_optimizer.estimate_tokens(prompt, model).estimated_tokens
+
             result = StageResult(
                 stage_name=stage.name,
                 role=stage.role,
@@ -339,8 +419,33 @@ class InquiryEngine:
                     "routing_score": routing.score,
                     "routing_reasoning": routing.reasoning,
                     "cognitive_style": stage.cognitive_style.value,
+                    "used_concise_prompt": used_concise,
+                    "prompt_tokens": prompt_tokens,
                 },
             )
+
+            # Track prompt effectiveness if tracker available
+            if self._prompt_tracker:
+                # Estimate cost based on model
+                cost_usd = 0.0
+                if self._budget_tracker:
+                    cost_usd = await self._budget_tracker.estimate_cost(
+                        prompt_tokens,
+                        tokens_used,
+                        model,
+                    )
+
+                self._prompt_tracker.record(
+                    stage_name=stage.name,
+                    model=model,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=tokens_used,
+                    quality_score=0.7,  # Default; would be from evaluator
+                    latency_ms=duration_ms,
+                    cost_usd=cost_usd,
+                    prompt_variant="concise" if used_concise else "default",
+                    adaptations_applied=["budget_aware"] if used_concise else [],
+                )
 
         except Exception as e:
             logger.error(f"Stage {stage.name} failed: {e}")
@@ -548,19 +653,53 @@ class InquiryEngine:
         self,
         session: InquirySession,
         stage: InquiryStage,
-    ) -> str:
-        """Build the prompt for a stage with context."""
+        budget_remaining: float | None = None,
+        budget_total: float | None = None,
+    ) -> tuple[str, bool]:
+        """
+        Build the prompt for a stage with context compression and budget awareness.
+
+        Args:
+            session: The inquiry session
+            stage: The stage to build prompt for
+            budget_remaining: Remaining budget (for budget-aware selection)
+            budget_total: Total budget
+
+        Returns:
+            Tuple of (prompt string, whether concise variant was used)
+        """
         previous_context = ""
         if session.workflow.context_accumulation and session.results:
-            previous_context = session.get_previous_context()
+            previous_context = session.get_previous_context(
+                token_optimizer=self._token_optimizer,
+                max_tokens=self._max_context_tokens,
+                use_summarization=True,
+            )
 
-        return get_prompt(
+        # Use budget-aware prompt selection if budget info available
+        if budget_remaining is not None and budget_total is not None:
+            return get_prompt_with_budget_awareness(
+                template_key=stage.prompt_template,
+                topic=session.topic,
+                previous_context=previous_context,
+                stage_number=len(session.results) + 1,
+                total_stages=session.total_stages,
+                budget_remaining=budget_remaining,
+                budget_total=budget_total,
+                token_optimizer=self._token_optimizer,
+            )
+
+        # Standard prompt generation
+        prompt = get_prompt(
             template_key=stage.prompt_template,
             topic=session.topic,
             previous_context=previous_context,
             stage_number=len(session.results) + 1,
             total_stages=session.total_stages,
+            token_optimizer=self._token_optimizer,
+            max_context_tokens=self._max_context_tokens,
         )
+        return prompt, False
 
     def _style_to_cognitive_type(
         self,
