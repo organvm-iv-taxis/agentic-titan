@@ -201,7 +201,7 @@ DEFAULT_ACTION_PATTERNS = [
     ),
     # LOW - Auto-approve
     ActionPattern(
-        pattern=r"(read|get|fetch|list|search)\s+",
+        pattern=r"(read|get|fetch|list|search)[\s_\-]",
         policy=ActionPolicy(
             risk_level=RiskLevel.LOW,
             requires_approval=False,

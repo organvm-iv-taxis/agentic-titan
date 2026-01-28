@@ -187,26 +187,49 @@ class OutputSanitizer:
     def _redact_api_keys(self, result: SanitizationResult) -> SanitizationResult:
         """Redact API keys."""
         patterns = [
-            (r"(?i)(api[_-]?key|apikey|api_secret)\s*[:=]\s*['\"]?([a-zA-Z0-9_\-]{20,})['\"]?", r"\1=[REDACTED]"),
+            (r"(?i)(api[_-]?key|apikey|api_secret)\s*[:=]\s*['\"]?([a-zA-Z0-9_\-]{8,})['\"]?", r"\1=[REDACTED]"),
             (r"(?i)(AKIA[0-9A-Z]{16})", "[AWS_KEY_REDACTED]"),
-            (r"sk-[a-zA-Z0-9]{48}", "[OPENAI_KEY_REDACTED]"),
+            (r"sk-[a-zA-Z0-9]{20,}", "[OPENAI_KEY_REDACTED]"),
             (r"ghp_[a-zA-Z0-9]{36}", "[GITHUB_TOKEN_REDACTED]"),
         ]
 
+        redacted = False
         for pattern, replacement in patterns:
             if re.search(pattern, result.sanitized):
                 result.sanitized = re.sub(pattern, replacement, result.sanitized)
-                result.changes_made.append("redacted API keys")
-                break
+                redacted = True
+
+        if redacted:
+            result.changes_made.append("redacted API keys")
 
         return result
 
     def _redact_passwords(self, result: SanitizationResult) -> SanitizationResult:
-        """Redact passwords."""
+        """Redact passwords, preserving code blocks."""
+        content = result.sanitized
+
+        # Preserve code blocks
+        code_blocks: list[tuple[str, str]] = []
+        code_pattern = r"(```[\s\S]*?```|`[^`]+`)"
+        for i, match in enumerate(re.finditer(code_pattern, content)):
+            placeholder = f"__PWD_CODE_BLOCK_{i}__"
+            code_blocks.append((placeholder, match.group()))
+
+        # Replace code blocks with placeholders
+        for placeholder, block in code_blocks:
+            content = content.replace(block, placeholder, 1)
+
+        # Redact passwords outside code blocks
         pattern = r"(?i)(password|passwd|pwd)\s*[:=]\s*['\"]?([^\s'\"]{8,})['\"]?"
-        if re.search(pattern, result.sanitized):
-            result.sanitized = re.sub(pattern, r"\1=[REDACTED]", result.sanitized)
+        if re.search(pattern, content):
+            content = re.sub(pattern, r"\1=[REDACTED]", content)
             result.changes_made.append("redacted passwords")
+
+        # Restore code blocks
+        for placeholder, block in code_blocks:
+            content = content.replace(placeholder, block, 1)
+
+        result.sanitized = content
         return result
 
     def _redact_tokens(self, result: SanitizationResult) -> SanitizationResult:

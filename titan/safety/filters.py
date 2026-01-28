@@ -385,35 +385,40 @@ class FilterPipeline:
         result = FilterResult(original_content=content)
         all_matches: list[FilterMatch] = []
         filtered_content = content
+        is_blocked = False
 
+        # Run all filters to accumulate all matches
         for filter_ in self._filters:
             filter_result = filter_.filter(filtered_content)
             all_matches.extend(filter_result.matches)
 
-            # Check blocking conditions
+            # Track if any filter blocks
             if filter_result.blocked:
-                result.blocked = True
-                result.matches = all_matches
-                result.filtered_content = None
-                await self._audit_filter_result(result, agent_id, session_id)
-                return result
+                is_blocked = True
 
-            if filter_result.sanitized and filter_result.filtered_content:
+            # Only sanitize if not blocked
+            if not is_blocked and filter_result.sanitized and filter_result.filtered_content:
                 filtered_content = filter_result.filtered_content
                 result.sanitized = True
 
             result.warnings.extend(filter_result.warnings)
 
         result.matches = all_matches
-        result.filtered_content = filtered_content
 
-        # Check severity-based blocking
-        if self._block_on_critical and result.critical_matches:
+        # Apply blocking
+        if is_blocked:
             result.blocked = True
             result.filtered_content = None
-        elif self._block_on_high and result.high_matches:
-            result.blocked = True
-            result.filtered_content = None
+        else:
+            result.filtered_content = filtered_content
+
+            # Check severity-based blocking
+            if self._block_on_critical and result.critical_matches:
+                result.blocked = True
+                result.filtered_content = None
+            elif self._block_on_high and result.high_matches:
+                result.blocked = True
+                result.filtered_content = None
 
         # Audit log the result
         await self._audit_filter_result(result, agent_id, session_id)

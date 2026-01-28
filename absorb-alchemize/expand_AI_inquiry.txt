@@ -1,0 +1,2044 @@
+ V1
+---
+import React, { useState } from ‘react’;
+import { Brain, Lightbulb, Network, RotateCw, Eye, TreePine, Code, Calculator, Palette, BookOpen } from ‘lucide-react’;
+
+const AIModelCognitiveChart = () => {
+const [selectedModel, setSelectedModel] = useState(null);
+const [selectedTask, setSelectedTask] = useState(null);
+
+const models = {
+‘Claude’: {
+color: ‘bg-orange-500’,
+textColor: ‘text-orange-700’,
+borderColor: ‘border-orange-300’,
+bgLight: ‘bg-orange-50’,
+description: ‘Structured reasoning, ethical analysis, consistent narrative development’,
+strengths: [
+‘Logical consistency across long reasoning chains’,
+‘Balanced multi-perspective analysis’,
+‘Ethical reasoning and nuanced judgment’,
+‘Coherent creative writing with thematic unity’,
+‘Complex problem decomposition’,
+‘Maintaining context in extended conversations’
+],
+weaknesses: [
+‘Sometimes overly cautious in creative exploration’,
+‘Can be verbose when brevity is needed’,
+‘May overthink simple problems’
+]
+},
+‘GPT-4’: {
+color: ‘bg-green-500’,
+textColor: ‘text-green-700’,
+borderColor: ‘border-green-300’,
+bgLight: ‘bg-green-50’,
+description: ‘Broad synthesis, creative pattern matching, cross-domain connections’,
+strengths: [
+‘Rapid pattern recognition across domains’,
+‘Creative synthesis of disparate concepts’,
+‘Strong general knowledge application’,
+‘Flexible code adaptation and generation’,
+‘Innovative problem-solving approaches’,
+‘Engaging conversational style’
+],
+weaknesses: [
+‘Can be inconsistent in complex reasoning’,
+‘May generate plausible but incorrect information’,
+‘Less reliable for fact-checking tasks’
+]
+},
+‘Gemini’: {
+color: ‘bg-blue-500’,
+textColor: ‘text-blue-700’,
+borderColor: ‘border-blue-300’,
+bgLight: ‘bg-blue-50’,
+description: ‘Mathematical reasoning, scientific analysis, multimodal processing’,
+strengths: [
+‘Strong mathematical and scientific reasoning’,
+‘Excellent with structured data analysis’,
+‘Multimodal reasoning (text + images)’,
+‘Systematic problem-solving approaches’,
+‘Precise logical deduction’,
+‘Strong performance on technical benchmarks’
+],
+weaknesses: [
+‘Less creative in open-ended tasks’,
+‘May struggle with ambiguous or subjective questions’,
+‘Can be overly technical in communication’
+]
+}
+};
+
+const cognitiveFrameworks = {
+‘Expansive Inquiry’: {
+stages: [
+{
+name: ‘Scope Clarification’,
+icon: <Eye className="w-5 h-5" />,
+description: ‘Refining complex topics into clear, focused questions’,
+bestModel: ‘Claude’,
+rationale: ‘Requires structured reasoning and logical consistency to distill complexity into clarity’,
+modelRankings: { Claude: 9, ‘GPT-4’: 7, Gemini: 6 }
+},
+{
+name: ‘Logical Branching’,
+icon: <Brain className="w-5 h-5" />,
+description: ‘Systematic rational exploration with layered questioning’,
+bestModel: ‘Claude’,
+rationale: ‘Benefits from maintaining logical consistency across multi-level reasoning chains’,
+modelRankings: { Claude: 9, Gemini: 8, ‘GPT-4’: 7 }
+},
+{
+name: ‘Intuitive Branching’,
+icon: <Lightbulb className="w-5 h-5" />,
+description: ‘Metaphorical and mythopoetic exploration’,
+bestModel: ‘GPT-4’,
+rationale: ‘Excels at creative synthesis and generating novel metaphorical frameworks’,
+modelRankings: { ‘GPT-4’: 9, Claude: 7, Gemini: 5 }
+},
+{
+name: ‘Lateral Exploration’,
+icon: <Network className="w-5 h-5" />,
+description: ‘Cross-domain connections and hybrid thinking’,
+bestModel: ‘GPT-4’,
+rationale: ‘Strong at pattern matching across disparate domains and broad knowledge synthesis’,
+modelRankings: { ‘GPT-4’: 9, Claude: 7, Gemini: 6 }
+},
+{
+name: ‘Recursive Design’,
+icon: <RotateCw className="w-5 h-5" />,
+description: ‘Self-improving feedback loops and meta-analysis’,
+bestModel: ‘Claude’,
+rationale: ‘Excellent at maintaining consistency while thinking about complex system relationships’,
+modelRankings: { Claude: 9, ‘GPT-4’: 6, Gemini: 7 }
+},
+{
+name: ‘Pattern Recognition’,
+icon: <TreePine className="w-5 h-5" />,
+description: ‘Identifying emergent meta-patterns across information’,
+bestModel: ‘Varies by pattern type’,
+rationale: ‘Mathematical patterns: Gemini, Narrative patterns: Claude, Creative patterns: GPT-4’,
+modelRankings: { Claude: 8, ‘GPT-4’: 8, Gemini: 8 }
+}
+]
+},
+‘Task-Specific Applications’: {
+stages: [
+{
+name: ‘Code Generation’,
+icon: <Code className="w-5 h-5" />,
+description: ‘Writing and debugging programming code’,
+bestModel: ‘GPT-4’,
+rationale: ‘Strong at pattern recognition in code and flexible adaptation of programming paradigms’,
+modelRankings: { ‘GPT-4’: 9, Claude: 8, Gemini: 7 }
+},
+{
+name: ‘Mathematical Analysis’,
+icon: <Calculator className="w-5 h-5" />,
+description: ‘Complex mathematical reasoning and problem-solving’,
+bestModel: ‘Gemini’,
+rationale: ‘Optimized for systematic mathematical thinking and logical deduction’,
+modelRankings: { Gemini: 9, Claude: 7, ‘GPT-4’: 6 }
+},
+{
+name: ‘Creative Writing’,
+icon: <Palette className="w-5 h-5" />,
+description: ‘Narrative creation and artistic expression’,
+bestModel: ‘Context-dependent’,
+rationale: ‘GPT-4 for innovation, Claude for consistency, Gemini for structured narratives’,
+modelRankings: { ‘GPT-4’: 8, Claude: 8, Gemini: 6 }
+},
+{
+name: ‘Research Synthesis’,
+icon: <BookOpen className="w-5 h-5" />,
+description: ‘Combining information from multiple sources’,
+bestModel: ‘Claude’,
+rationale: ‘Excellent at maintaining coherence while integrating diverse perspectives’,
+modelRankings: { Claude: 9, ‘GPT-4’: 7, Gemini: 6 }
+}
+]
+}
+};
+
+const getRankingColor = (score) => {
+if (score >= 9) return ‘bg-green-500’;
+if (score >= 7) return ‘bg-yellow-500’;
+return ‘bg-red-500’;
+};
+
+const getRankingText = (score) => {
+if (score >= 9) return ‘Excellent’;
+if (score >= 7) return ‘Good’;
+return ‘Fair’;
+};
+
+return (
+<div className="max-w-7xl mx-auto p-6 bg-gray-50 min-h-screen">
+<div className="bg-white rounded-lg shadow-lg p-8 mb-6">
+<h1 className="text-3xl font-bold mb-4 text-center text-gray-800">
+AI Model Cognitive Strengths & Collaborative System Design
+</h1>
+<p className="text-gray-600 text-center mb-8 max-w-4xl mx-auto">
+Understanding how different AI models excel at different types of cognitive tasks allows you to design
+more effective collaborative AI systems. This chart shows which models work best for specific cognitive
+roles and how to combine them strategically.
+</p>
+</div>
+
+```
+  {/* Model Overview Section */}
+  <div className="bg-white rounded-lg shadow-lg p-8 mb-6">
+    <h2 className="text-2xl font-bold mb-6 text-gray-800">AI Model Cognitive Profiles</h2>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {Object.entries(models).map(([modelName, modelData]) => (
+        <div 
+          key={modelName}
+          className={`p-6 rounded-lg border-2 cursor-pointer transition-all ${
+            selectedModel === modelName ? 
+            `${modelData.borderColor} ${modelData.bgLight}` : 
+            'border-gray-200 hover:border-gray-300'
+          }`}
+          onClick={() => setSelectedModel(selectedModel === modelName ? null : modelName)}
+        >
+          <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-white text-sm mb-4 ${modelData.color}`}>
+            <Brain className="w-4 h-4" />
+            {modelName}
+          </div>
+          <p className={`text-sm mb-4 ${modelData.textColor} font-medium`}>
+            {modelData.description}
+          </p>
+          
+          {selectedModel === modelName && (
+            <div className="mt-4 space-y-4">
+              <div>
+                <h4 className="font-semibold text-gray-800 mb-2">Key Strengths:</h4>
+                <div className="space-y-1">
+                  {modelData.strengths.map((strength, index) => (
+                    <div key={index} className="text-sm text-gray-600 flex items-start gap-2">
+                      <span className="text-green-500 mt-1">●</span>
+                      {strength}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              <div>
+                <h4 className="font-semibold text-gray-800 mb-2">Potential Limitations:</h4>
+                <div className="space-y-1">
+                  {modelData.weaknesses.map((weakness, index) => (
+                    <div key={index} className="text-sm text-gray-600 flex items-start gap-2">
+                      <span className="text-orange-500 mt-1">●</span>
+                      {weakness}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  </div>
+
+  {/* Cognitive Frameworks Section */}
+  <div className="bg-white rounded-lg shadow-lg p-8">
+    <h2 className="text-2xl font-bold mb-6 text-gray-800">Cognitive Framework Applications</h2>
+    
+    {Object.entries(cognitiveFrameworks).map(([frameworkName, frameworkData]) => (
+      <div key={frameworkName} className="mb-8">
+        <h3 className="text-xl font-semibold mb-4 text-gray-800">{frameworkName}</h3>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {frameworkData.stages.map((stage, index) => (
+            <div 
+              key={index}
+              className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                selectedTask === `${frameworkName}-${index}` ? 
+                'border-blue-400 bg-blue-50' : 
+                'border-gray-200 hover:border-gray-300'
+              }`}
+              onClick={() => setSelectedTask(selectedTask === `${frameworkName}-${index}` ? null : `${frameworkName}-${index}`)}
+            >
+              <div className="flex items-start gap-3 mb-3">
+                <div className="flex-shrink-0 p-2 bg-blue-100 rounded-lg">
+                  {stage.icon}
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-semibold text-gray-800 mb-1">{stage.name}</h4>
+                  <p className="text-sm text-gray-600 mb-2">{stage.description}</p>
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="font-medium text-gray-700">Best Model:</span>
+                    <span className="font-semibold text-blue-600">{stage.bestModel}</span>
+                  </div>
+                </div>
+              </div>
+              
+              {selectedTask === `${frameworkName}-${index}` && (
+                <div className="mt-4 space-y-4">
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <h5 className="font-medium text-gray-800 mb-2">Why This Model Works Best:</h5>
+                    <p className="text-sm text-gray-700">{stage.rationale}</p>
+                  </div>
+                  
+                  <div>
+                    <h5 className="font-medium text-gray-800 mb-3">Model Performance Comparison:</h5>
+                    <div className="space-y-2">
+                      {Object.entries(stage.modelRankings).map(([model, score]) => (
+                        <div key={model} className="flex items-center gap-3">
+                          <span className="w-16 text-sm font-medium text-gray-700">{model}</span>
+                          <div className="flex-1 bg-gray-200 rounded-full h-2">
+                            <div 
+                              className={`h-2 rounded-full ${getRankingColor(score)}`}
+                              style={{ width: `${(score / 10) * 100}%` }}
+                            ></div>
+                          </div>
+                          <span className="text-sm font-medium text-gray-600">
+                            {score}/10 - {getRankingText(score)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    ))}
+  </div>
+
+  {/* Strategic Insights Section */}
+  <div className="bg-white rounded-lg shadow-lg p-8 mt-6">
+    <h2 className="text-2xl font-bold mb-6 text-gray-800">Strategic Insights for Collaborative AI Design</h2>
+    
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="bg-blue-50 p-6 rounded-lg">
+        <h3 className="text-lg font-semibold mb-3 text-blue-800">Complementary Strengths</h3>
+        <p className="text-sm text-blue-700 mb-3">
+          The most effective collaborative AI systems leverage the complementary strengths of different models 
+          rather than trying to find one "best" model for everything.
+        </p>
+        <div className="text-sm text-blue-700">
+          <strong>Example:</strong> Use GPT-4 for creative ideation, Claude for logical analysis, and Gemini for 
+          mathematical verification in the same workflow.
+        </div>
+      </div>
+      
+      <div className="bg-green-50 p-6 rounded-lg">
+        <h3 className="text-lg font-semibold mb-3 text-green-800">Context Accumulation</h3>
+        <p className="text-sm text-green-700 mb-3">
+          Each AI in the sequence builds upon the full conversation history, creating cumulative intelligence 
+          that exceeds what any single model could achieve alone.
+        </p>
+        <div className="text-sm text-green-700">
+          <strong>Key Insight:</strong> The collaborative effect emerges from the interaction between different 
+          cognitive perspectives, not just from individual model capabilities.
+        </div>
+      </div>
+      
+      <div className="bg-purple-50 p-6 rounded-lg">
+        <h3 className="text-lg font-semibold mb-3 text-purple-800">Adaptive Selection</h3>
+        <p className="text-sm text-purple-700 mb-3">
+          The "best" model for each cognitive role depends on the specific topic, context, and desired outcome. 
+          Consider building systems that can adapt their model selection based on the task at hand.
+        </p>
+        <div className="text-sm text-purple-700">
+          <strong>Implementation:</strong> Use metadata about the topic to automatically select the most 
+          appropriate model for each stage of the collaborative process.
+        </div>
+      </div>
+      
+      <div className="bg-orange-50 p-6 rounded-lg">
+        <h3 className="text-lg font-semibold mb-3 text-orange-800">Empirical Validation</h3>
+        <p className="text-sm text-orange-700 mb-3">
+          While these rankings provide general guidance, the most effective approach is to empirically test 
+          different model combinations on your specific use cases and topics.
+        </p>
+        <div className="text-sm text-orange-700">
+          <strong>Best Practice:</strong> Run parallel experiments with different model configurations and 
+          compare the quality and diversity of insights generated.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+```
+
+);
+};
+
+export default AIModelCognitiveChart;
+---
+
+V2
+---
+
+import React, { useState } from ‘react’;
+import { Play, Pause, RotateCcw, Brain, Lightbulb, Network, RotateCw, Eye, TreePine } from ‘lucide-react’;
+
+const ExpansiveInquirySystem = () => {
+const [topic, setTopic] = useState(’’);
+const [currentStage, setCurrentStage] = useState(0);
+const [isRunning, setIsRunning] = useState(false);
+const [results, setResults] = useState({});
+const [collaborativeMode, setCollaborativeMode] = useState(true);
+
+const stages = [
+{
+name: “Scope Clarification”,
+icon: <Eye className="w-5 h-5" />,
+role: “Scope AI”,
+color: “bg-blue-500”,
+description: “Refines and clarifies the core inquiry”
+},
+{
+name: “Logical Branching”,
+icon: <Brain className="w-5 h-5" />,
+role: “Logic AI”,
+color: “bg-green-500”,
+description: “Systematic rational exploration”
+},
+{
+name: “Intuitive Branching”,
+icon: <Lightbulb className="w-5 h-5" />,
+role: “Mythos AI”,
+color: “bg-purple-500”,
+description: “Metaphorical and mythopoetic exploration”
+},
+{
+name: “Lateral Exploration”,
+icon: <Network className="w-5 h-5" />,
+role: “Bridge AI”,
+color: “bg-orange-500”,
+description: “Cross-domain connections”
+},
+{
+name: “Recursive Design”,
+icon: <RotateCw className="w-5 h-5" />,
+role: “Meta AI”,
+color: “bg-red-500”,
+description: “Self-improving feedback loops”
+},
+{
+name: “Pattern Recognition”,
+icon: <TreePine className="w-5 h-5" />,
+role: “Pattern AI”,
+color: “bg-indigo-500”,
+description: “Emergent meta-patterns”
+}
+];
+
+const runStage = async (stageIndex) => {
+const stage = stages[stageIndex];
+setCurrentStage(stageIndex);
+
+```
+// Simulate AI processing with different prompting strategies
+const prompts = {
+  0: `Topic: ${topic}
+```
+
+System: You are a Scope Clarification AI. Your role is to take any topic and distill it into a single, precise, actionable sentence that captures the core inquiry.
+
+Task: Restate “${topic}” as a clear, focused question or statement that serves as the foundation for deep exploration. Consider what aspects are most essential and what might be peripheral.`,
+
+```
+  1: `Topic: ${topic}
+```
+
+System: You are a Logic AI specialized in systematic rational exploration. You build rigorous logical frameworks.
+
+Previous Context: ${JSON.stringify(results)}
+
+Task:
+
+1. List 5 orthodox, rational lines of inquiry about “${topic}”
+1. For each line, drill down 3 levels using “why?”, “how?”, or “what if?” questions
+1. Create a logical tree structure showing how these questions build upon each other`,
+   
+   2: `Topic: ${topic}
+
+System: You are a Mythos AI that thinks in stories, metaphors, and archetypal patterns. You reveal hidden dimensions through narrative and symbol.
+
+Previous Context: ${JSON.stringify(results)}
+
+Task:
+
+1. Propose 5 metaphorical/mythopoetic framings for “${topic}”
+1. For each framing, generate analogies or brief stories that illuminate hidden dimensions
+1. Use archetypal language and symbolic thinking to reveal deeper patterns`,
+   
+   3: `Topic: ${topic}
+
+System: You are a Bridge AI that specializes in finding unexpected connections between seemingly unrelated domains.
+
+Previous Context: ${JSON.stringify(results)}
+
+Task:
+
+1. Identify 5 seemingly unrelated domains or disciplines
+1. Draw specific analogies that bridge each domain to “${topic}”
+1. Propose hybrid questions that emerge from these cross-domain connections`,
+   
+   4: `Topic: ${topic}
+
+System: You are a Meta AI that designs self-improving recursive systems. You think about thinking itself.
+
+Previous Context: ${JSON.stringify(results)}
+
+Task:
+
+1. Analyze the previous inquiry stages and design a feedback loop that could refine them
+1. Suggest 3 ways this loop could evolve new questions or prune dead ends
+1. Identify how the system could learn from its own inquiry patterns`,
+   
+   5: `Topic: ${topic}
+
+System: You are a Pattern AI that recognizes emergent structures and meta-patterns across complex information.
+
+Previous Context: ${JSON.stringify(results)}
+
+Task:
+
+1. Scan all previous insights for repeating motifs, structures, or themes
+1. Propose 3 emergent “meta-patterns” that span across the different inquiry modes
+1. Speculate on the broader significance of these patterns for understanding “${topic}”`
+   };
+   
+   try {
+   const response = await window.claude.complete(prompts[stageIndex]);
+   
+   setResults(prev => ({
+   …prev,
+   [stageIndex]: {
+   stage: stage.name,
+   role: stage.role,
+   content: response,
+   timestamp: new Date().toISOString()
+   }
+   }));
+   } catch (error) {
+   console.error(‘Error in stage execution:’, error);
+   setResults(prev => ({
+   …prev,
+   [stageIndex]: {
+   stage: stage.name,
+   role: stage.role,
+   content: “Error processing this stage. Please try again.”,
+   timestamp: new Date().toISOString()
+   }
+   }));
+   }
+   };
+
+const runFullSequence = async () => {
+if (!topic.trim()) {
+alert(‘Please enter a topic to explore’);
+return;
+}
+
+```
+setIsRunning(true);
+setResults({});
+
+for (let i = 0; i < stages.length; i++) {
+  await runStage(i);
+  // Add a small delay to make the process visible
+  await new Promise(resolve => setTimeout(resolve, 1000));
+}
+
+setIsRunning(false);
+setCurrentStage(-1);
+```
+
+};
+
+const reset = () => {
+setResults({});
+setCurrentStage(0);
+setIsRunning(false);
+};
+
+return (
+<div className="max-w-6xl mx-auto p-6 bg-gray-50 min-h-screen">
+<div className="bg-white rounded-lg shadow-lg p-8 mb-6">
+<h1 className="text-3xl font-bold mb-6 text-center text-gray-800">
+Expansive Inquiry AI Collaboration System
+</h1>
+
+```
+    <div className="mb-6">
+      <label className="block text-sm font-medium text-gray-700 mb-2">
+        Topic for Exploration
+      </label>
+      <input
+        type="text"
+        value={topic}
+        onChange={(e) => setTopic(e.target.value)}
+        placeholder="Enter any topic you want to explore deeply..."
+        className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+      />
+    </div>
+
+    <div className="flex gap-4 mb-6">
+      <button
+        onClick={runFullSequence}
+        disabled={isRunning || !topic.trim()}
+        className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+      >
+        {isRunning ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+        {isRunning ? 'Processing...' : 'Start Collaborative Inquiry'}
+      </button>
+      
+      <button
+        onClick={reset}
+        className="flex items-center gap-2 px-6 py-3 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+      >
+        <RotateCcw className="w-5 h-5" />
+        Reset
+      </button>
+    </div>
+
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+      {stages.map((stage, index) => (
+        <div key={index} className="relative">
+          <div className={`p-4 rounded-lg border-2 ${
+            currentStage === index ? 'border-yellow-400 bg-yellow-50' : 
+            results[index] ? 'border-green-400 bg-green-50' : 
+            'border-gray-200 bg-white'
+          }`}>
+            <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-white text-sm mb-3 ${stage.color}`}>
+              {stage.icon}
+              {stage.role}
+            </div>
+            <h3 className="font-semibold text-gray-800 mb-2">{stage.name}</h3>
+            <p className="text-sm text-gray-600 mb-3">{stage.description}</p>
+            
+            {currentStage === index && isRunning && (
+              <div className="text-sm text-blue-600 font-medium">Processing...</div>
+            )}
+            
+            {results[index] && (
+              <div className="text-sm text-green-600 font-medium">✓ Complete</div>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+
+  {Object.keys(results).length > 0 && (
+    <div className="bg-white rounded-lg shadow-lg p-8">
+      <h2 className="text-2xl font-bold mb-6 text-gray-800">Collaborative Inquiry Results</h2>
+      
+      <div className="space-y-6">
+        {Object.entries(results).map(([stageIndex, result]) => (
+          <div key={stageIndex} className="border-l-4 border-blue-500 pl-6 py-4">
+            <div className="flex items-center gap-2 mb-3">
+              {stages[stageIndex].icon}
+              <h3 className="text-lg font-semibold text-gray-800">
+                {result.stage} - {result.role}
+              </h3>
+            </div>
+            <div className="prose max-w-none">
+              <pre className="whitespace-pre-wrap text-sm text-gray-700 bg-gray-50 p-4 rounded-md overflow-x-auto">
+                {result.content}
+              </pre>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {Object.keys(results).length === stages.length && (
+        <div className="mt-8 p-6 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg">
+          <h3 className="text-lg font-semibold text-gray-800 mb-3">
+            🎯 Collaborative Inquiry Complete
+          </h3>
+          <p className="text-gray-700">
+            The system has completed all six stages of expansive inquiry. Each AI specialist has contributed their unique perspective to create a comprehensive exploration of "{topic}". 
+            Notice how the different AI roles built upon each other's insights to reveal dimensions that no single AI could have discovered alone.
+          </p>
+        </div>
+      )}
+    </div>
+  )}
+</div>
+```
+
+);
+};
+---
+
+V3
+___
+import React, { useState } from ‘react’;
+import { Play, Pause, RotateCcw, Brain, Lightbulb, Network, RotateCw, Eye, TreePine, Download, FileText } from ‘lucide-react’;
+
+const ExpansiveInquirySystem = () => {
+const [topic, setTopic] = useState(’’);
+const [currentStage, setCurrentStage] = useState(0);
+const [isRunning, setIsRunning] = useState(false);
+const [results, setResults] = useState({});
+const [collaborativeMode, setCollaborativeMode] = useState(true);
+
+const stages = [
+{
+name: “Scope Clarification”,
+icon: <Eye className="w-5 h-5" />,
+role: “Scope AI”,
+color: “bg-blue-500”,
+description: “Refines and clarifies the core inquiry”
+},
+{
+name: “Logical Branching”,
+icon: <Brain className="w-5 h-5" />,
+role: “Logic AI”,
+color: “bg-green-500”,
+description: “Systematic rational exploration”
+},
+{
+name: “Intuitive Branching”,
+icon: <Lightbulb className="w-5 h-5" />,
+role: “Mythos AI”,
+color: “bg-purple-500”,
+description: “Metaphorical and mythopoetic exploration”
+},
+{
+name: “Lateral Exploration”,
+icon: <Network className="w-5 h-5" />,
+role: “Bridge AI”,
+color: “bg-orange-500”,
+description: “Cross-domain connections”
+},
+{
+name: “Recursive Design”,
+icon: <RotateCw className="w-5 h-5" />,
+role: “Meta AI”,
+color: “bg-red-500”,
+description: “Self-improving feedback loops”
+},
+{
+name: “Pattern Recognition”,
+icon: <TreePine className="w-5 h-5" />,
+role: “Pattern AI”,
+color: “bg-indigo-500”,
+description: “Emergent meta-patterns”
+}
+];
+
+const generateMarkdownFile = (stageIndex, result) => {
+const stage = stages[stageIndex];
+const timestamp = new Date().toISOString();
+const dateFormatted = new Date().toLocaleDateString(‘en-US’, {
+year: ‘numeric’,
+month: ‘long’,
+day: ‘numeric’
+});
+
+```
+const slugTitle = topic.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+const stageSlug = stage.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+return `---
+```
+
+title: “${stage.name} - ${topic}”
+description: “${stage.description}”
+topic: “${topic}”
+stage: “${stage.name}”
+ai_role: “${stage.role}”
+stage_number: ${parseInt(stageIndex) + 1}
+total_stages: ${stages.length}
+inquiry_type: “expansive_collaborative”
+generated_date: “${timestamp}”
+tags:
+
+- expansive-inquiry
+- ai-collaboration
+- ${stageSlug}
+- cognitive-exploration
+- ${slugTitle}
+  metadata:
+  methodology: “Multi-AI Collaborative Inquiry”
+  approach: “${stage.role}”
+  complexity: “deep”
+  domain: “cross-disciplinary”
+
+-----
+
+# ${stage.name}: ${topic}
+
+**AI Role:** ${stage.role}  
+**Generated:** ${dateFormatted}  
+**Stage:** ${parseInt(stageIndex) + 1} of ${stages.length}
+
+## Overview
+
+${stage.description}
+
+## Inquiry Results
+
+${result.content}
+
+-----
+
+*This document was generated as part of an Expansive Inquiry AI Collaboration System. Each stage builds upon previous insights to create a comprehensive exploration of the topic.*
+
+**Next Steps:**
+
+- Review findings from previous stages
+- Identify patterns and connections
+- Prepare for subsequent inquiry phases
+
+**System Info:**
+
+- Methodology: Multi-AI Collaborative Inquiry
+- Timestamp: ${timestamp}
+- Topic: ${topic}
+  `;
+  };
+  
+  const downloadMarkdown = (stageIndex, result) => {
+  const stage = stages[stageIndex];
+  const markdown = generateMarkdownFile(stageIndex, result);
+  const slugTitle = topic.toLowerCase().replace(/[^a-z0-9]+/g, ‘-’).replace(/(^-|-$)/g, ‘’);
+  const stageSlug = stage.name.toLowerCase().replace(/[^a-z0-9]+/g, ‘-’);
+  const filename = `${slugTitle}-${stageSlug}-stage-${parseInt(stageIndex) + 1}.md`;
+  
+  const blob = new Blob([markdown], { type: ‘text/markdown’ });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement(‘a’);
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  };
+  
+  const downloadAllMarkdown = () => {
+  Object.entries(results).forEach(([stageIndex, result]) => {
+  setTimeout(() => downloadMarkdown(parseInt(stageIndex), result), parseInt(stageIndex) * 500);
+  });
+  };
+  
+  const runStage = async (stageIndex) => {
+  const stage = stages[stageIndex];
+  setCurrentStage(stageIndex);
+  
+  // Enhanced prompting strategies with better context integration
+  const prompts = {
+  0: `Topic: ${topic}
+
+System: You are a Scope Clarification AI. Your role is to take any topic and distill it into a single, precise, actionable sentence that captures the core inquiry.
+
+Task: Restate “${topic}” as a clear, focused question or statement that serves as the foundation for deep exploration. Consider what aspects are most essential and what might be peripheral.
+
+Please format your response as structured markdown with clear sections.`,
+
+```
+  1: `Topic: ${topic}
+```
+
+System: You are a Logic AI specialized in systematic rational exploration. You build rigorous logical frameworks.
+
+Previous Context: ${JSON.stringify(results)}
+
+Task:
+
+1. List 5 orthodox, rational lines of inquiry about “${topic}”
+1. For each line, drill down 3 levels using “why?”, “how?”, or “what if?” questions
+1. Create a logical tree structure showing how these questions build upon each other
+
+Please format your response as structured markdown with clear sections and hierarchical organization.`,
+
+```
+  2: `Topic: ${topic}
+```
+
+System: You are a Mythos AI that thinks in stories, metaphors, and archetypal patterns. You reveal hidden dimensions through narrative and symbol.
+
+Previous Context: ${JSON.stringify(results)}
+
+Task:
+
+1. Propose 5 metaphorical/mythopoetic framings for “${topic}”
+1. For each framing, generate analogies or brief stories that illuminate hidden dimensions
+1. Use archetypal language and symbolic thinking to reveal deeper patterns
+
+Please format your response as structured markdown with clear sections and rich narrative elements.`,
+
+```
+  3: `Topic: ${topic}
+```
+
+System: You are a Bridge AI that specializes in finding unexpected connections between seemingly unrelated domains.
+
+Previous Context: ${JSON.stringify(results)}
+
+Task:
+
+1. Identify 5 seemingly unrelated domains or disciplines
+1. Draw specific analogies that bridge each domain to “${topic}”
+1. Propose hybrid questions that emerge from these cross-domain connections
+
+Please format your response as structured markdown with clear sections and connection mappings.`,
+
+```
+  4: `Topic: ${topic}
+```
+
+System: You are a Meta AI that designs self-improving recursive systems. You think about thinking itself.
+
+Previous Context: ${JSON.stringify(results)}
+
+Task:
+
+1. Analyze the previous inquiry stages and design a feedback loop that could refine them
+1. Suggest 3 ways this loop could evolve new questions or prune dead ends
+1. Identify how the system could learn from its own inquiry patterns
+
+Please format your response as structured markdown with clear sections and system design elements.`,
+
+```
+  5: `Topic: ${topic}
+```
+
+System: You are a Pattern AI that recognizes emergent structures and meta-patterns across complex information.
+
+Previous Context: ${JSON.stringify(results)}
+
+Task:
+
+1. Scan all previous insights for repeating motifs, structures, or themes
+1. Propose 3 emergent “meta-patterns” that span across the different inquiry modes
+1. Speculate on the broader significance of these patterns for understanding “${topic}”
+
+Please format your response as structured markdown with clear sections and pattern analysis.`
+};
+
+```
+try {
+  const response = await window.claude.complete(prompts[stageIndex]);
+  
+  const result = {
+    stage: stage.name,
+    role: stage.role,
+    content: response,
+    timestamp: new Date().toISOString()
+  };
+  
+  setResults(prev => ({
+    ...prev,
+    [stageIndex]: result
+  }));
+} catch (error) {
+  console.error('Error in stage execution:', error);
+  setResults(prev => ({
+    ...prev,
+    [stageIndex]: {
+      stage: stage.name,
+      role: stage.role,
+      content: "Error processing this stage. Please try again.",
+      timestamp: new Date().toISOString()
+    }
+  }));
+}
+```
+
+};
+
+const runFullSequence = async () => {
+if (!topic.trim()) {
+alert(‘Please enter a topic to explore’);
+return;
+}
+
+```
+setIsRunning(true);
+setResults({});
+
+for (let i = 0; i < stages.length; i++) {
+  await runStage(i);
+  // Add a small delay to make the process visible
+  await new Promise(resolve => setTimeout(resolve, 1000));
+}
+
+setIsRunning(false);
+setCurrentStage(-1);
+```
+
+};
+
+const reset = () => {
+setResults({});
+setCurrentStage(0);
+setIsRunning(false);
+};
+
+return (
+<div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+{/* Animated background elements */}
+<div className="fixed inset-0 overflow-hidden pointer-events-none">
+<div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"></div>
+<div className="absolute top-3/4 right-1/4 w-96 h-96 bg-cyan-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse animation-delay-2s"></div>
+<div className="absolute bottom-1/4 left-1/2 w-96 h-96 bg-pink-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse animation-delay-4s"></div>
+</div>
+
+```
+  <div className="relative z-10 max-w-7xl mx-auto p-6">
+    {/* Header */}
+    <div className="text-center mb-12">
+      <h1 className="text-6xl font-bold bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent mb-4">
+        Expansive Inquiry
+      </h1>
+      <div className="text-xl text-gray-300 mb-2">AI Collaboration System</div>
+      <div className="w-24 h-1 bg-gradient-to-r from-cyan-400 to-purple-400 mx-auto rounded-full"></div>
+    </div>
+
+    {/* Main Control Panel */}
+    <div className="bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl p-8 mb-8 border border-white/20">
+      <div className="mb-8">
+        <label className="block text-lg font-semibold text-white mb-4">
+          Topic for Deep Exploration
+        </label>
+        <input
+          type="text"
+          value={topic}
+          onChange={(e) => setTopic(e.target.value)}
+          placeholder="Enter any topic to explore across multiple AI perspectives..."
+          className="w-full p-4 bg-white/20 backdrop-blur-sm border border-white/30 rounded-xl text-white placeholder-gray-300 focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all duration-300"
+        />
+      </div>
+
+      <div className="flex flex-wrap gap-4 mb-8">
+        <button
+          onClick={runFullSequence}
+          disabled={isRunning || !topic.trim()}
+          className="flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-cyan-500 to-purple-500 text-white rounded-xl hover:from-cyan-600 hover:to-purple-600 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1 font-semibold"
+        >
+          {isRunning ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+          {isRunning ? 'Processing Inquiry...' : 'Begin Collaborative Inquiry'}
+        </button>
+        
+        <button
+          onClick={reset}
+          className="flex items-center gap-3 px-8 py-4 bg-white/20 backdrop-blur-sm text-white rounded-xl hover:bg-white/30 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1 font-semibold border border-white/30"
+        >
+          <RotateCcw className="w-5 h-5" />
+          Reset System
+        </button>
+
+        {Object.keys(results).length > 0 && (
+          <button
+            onClick={downloadAllMarkdown}
+            className="flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl hover:from-green-600 hover:to-emerald-600 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1 font-semibold"
+          >
+            <Download className="w-5 h-5" />
+            Download All MD Files
+          </button>
+        )}
+      </div>
+
+      {/* Progress indicator */}
+      {isRunning && (
+        <div className="mb-6">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-sm text-gray-300">Processing Stage {currentStage + 1} of {stages.length}</span>
+            <span className="text-sm text-gray-300">{Math.round(((currentStage + 1) / stages.length) * 100)}%</span>
+          </div>
+          <div className="w-full bg-gray-700 rounded-full h-2">
+            <div 
+              className="bg-gradient-to-r from-cyan-400 to-purple-400 h-2 rounded-full transition-all duration-1000"
+              style={{ width: `${((currentStage + 1) / stages.length) * 100}%` }}
+            ></div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Stages Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {stages.map((stage, index) => (
+          <div key={index} className="group relative">
+            <div className={`p-6 rounded-2xl border-2 transition-all duration-300 ${
+              currentStage === index ? 'border-yellow-400 bg-yellow-400/20 scale-105' : 
+              results[index] ? 'border-green-400 bg-green-400/20 hover:scale-105' : 
+              'border-white/20 bg-white/10 hover:bg-white/20'
+            } backdrop-blur-sm`}>
+              <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-white text-sm mb-4 ${stage.color} shadow-lg`}>
+                {stage.icon}
+                {stage.role}
+              </div>
+              <h3 className="font-bold text-white mb-3 text-lg">{stage.name}</h3>
+              <p className="text-gray-300 mb-4 text-sm leading-relaxed">{stage.description}</p>
+              
+              {currentStage === index && isRunning && (
+                <div className="flex items-center gap-2 text-yellow-400 font-semibold">
+                  <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
+                  Processing...
+                </div>
+              )}
+              
+              {results[index] && (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-green-400 font-semibold">
+                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                    Complete
+                  </div>
+                  <button
+                    onClick={() => downloadMarkdown(index, results[index])}
+                    className="flex items-center gap-1 px-3 py-1 bg-white/20 rounded-lg hover:bg-white/30 transition-colors text-white text-sm"
+                  >
+                    <FileText className="w-4 h-4" />
+                    MD
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    {/* Results Display */}
+    {Object.keys(results).length > 0 && (
+      <div className="bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl p-8 border border-white/20">
+        <div className="flex items-center justify-between mb-8">
+          <h2 className="text-3xl font-bold text-white">Inquiry Results</h2>
+          {Object.keys(results).length === stages.length && (
+            <div className="flex items-center gap-2 px-4 py-2 bg-green-500/20 rounded-full border border-green-400">
+              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+              <span className="text-green-400 font-semibold">Complete</span>
+            </div>
+          )}
+        </div>
+        
+        <div className="space-y-8">
+          {Object.entries(results).map(([stageIndex, result]) => (
+            <div key={stageIndex} className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-full ${stages[stageIndex].color}`}>
+                    {stages[stageIndex].icon}
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-white">
+                      {result.stage}
+                    </h3>
+                    <p className="text-gray-300 text-sm">{result.role}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => downloadMarkdown(parseInt(stageIndex), result)}
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl hover:from-blue-600 hover:to-purple-600 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
+                >
+                  <Download className="w-4 h-4" />
+                  Download MD
+                </button>
+              </div>
+              
+              <div className="bg-black/20 rounded-xl p-4 border border-white/10">
+                <pre className="whitespace-pre-wrap text-sm text-gray-200 overflow-x-auto max-h-96 overflow-y-auto">
+                  {result.content}
+                </pre>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {Object.keys(results).length === stages.length && (
+          <div className="mt-8 p-6 bg-gradient-to-r from-purple-500/20 to-cyan-500/20 rounded-2xl border border-purple-400/30">
+            <h3 className="text-xl font-bold text-white mb-3 flex items-center gap-2">
+              🎯 Multi-AI Collaboration Complete
+            </h3>
+            <p className="text-gray-300 leading-relaxed">
+              The system has completed all six stages of expansive inquiry. Each specialized AI has contributed their unique perspective to create a comprehensive exploration of "{topic}". 
+              Notice how the different AI roles built upon each other's insights to reveal dimensions that no single AI could have discovered alone.
+            </p>
+            <div className="mt-4 p-4 bg-white/10 rounded-xl">
+              <p className="text-sm text-gray-300">
+                💡 <strong>Pro Tip:</strong> Each stage's markdown file contains properly formatted YAML frontmatter with metadata, tags, and structured content ready for your knowledge management system.
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+    )}
+  </div>
+</div>
+```
+
+);
+};
+
+export default ExpansiveInquirySystem;
+---
+
+
+V4
+---
+export default ExpansiveInquirySystem;
+
+
+
+import React, { useState } from 'react';
+import { Play, Pause, RotateCcw, Brain, Lightbulb, Network, RotateCw, Eye, TreePine, Download, FileText } from 'lucide-react';
+
+const ExpansiveInquirySystem = () => {
+  const [topic, setTopic] = useState('');
+  const [currentStage, setCurrentStage] = useState(0);
+  const [isRunning, setIsRunning] = useState(false);
+  const [results, setResults] = useState({});
+  const [collaborativeMode, setCollaborativeMode] = useState(true);
+
+  const stages = [
+    {
+      name: "Scope Clarification",
+      icon: <Eye className="w-5 h-5" />,
+      role: "Scope AI",
+      color: "bg-blue-500",
+      description: "Refines and clarifies the core inquiry"
+    },
+    {
+      name: "Logical Branching",
+      icon: <Brain className="w-5 h-5" />,
+      role: "Logic AI",
+      color: "bg-green-500",
+      description: "Systematic rational exploration"
+    },
+    {
+      name: "Intuitive Branching",
+      icon: <Lightbulb className="w-5 h-5" />,
+      role: "Mythos AI",
+      color: "bg-purple-500",
+      description: "Metaphorical and mythopoetic exploration"
+    },
+    {
+      name: "Lateral Exploration",
+      icon: <Network className="w-5 h-5" />,
+      role: "Bridge AI",
+      color: "bg-orange-500",
+      description: "Cross-domain connections"
+    },
+    {
+      name: "Recursive Design",
+      icon: <RotateCw className="w-5 h-5" />,
+      role: "Meta AI",
+      color: "bg-red-500",
+      description: "Self-improving feedback loops"
+    },
+    {
+      name: "Pattern Recognition",
+      icon: <TreePine className="w-5 h-5" />,
+      role: "Pattern AI",
+      color: "bg-indigo-500",
+      description: "Emergent meta-patterns"
+    }
+  ];
+
+  const generateMarkdownFile = (stageIndex, result) => {
+    const stage = stages[stageIndex];
+    const timestamp = new Date().toISOString();
+    const dateFormatted = new Date().toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    
+    const slugTitle = topic.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const stageSlug = stage.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    
+    return `---
+title: "${stage.name} - ${topic}"
+description: "${stage.description}"
+topic: "${topic}"
+stage: "${stage.name}"
+ai_role: "${stage.role}"
+stage_number: ${parseInt(stageIndex) + 1}
+total_stages: ${stages.length}
+inquiry_type: "expansive_collaborative"
+generated_date: "${timestamp}"
+tags:
+  - expansive-inquiry
+  - ai-collaboration
+  - ${stageSlug}
+  - cognitive-exploration
+  - ${slugTitle}
+metadata:
+  methodology: "Multi-AI Collaborative Inquiry"
+  approach: "${stage.role}"
+  complexity: "deep"
+  domain: "cross-disciplinary"
+---
+
+# ${stage.name}: ${topic}
+
+**AI Role:** ${stage.role}  
+**Generated:** ${dateFormatted}  
+**Stage:** ${parseInt(stageIndex) + 1} of ${stages.length}
+
+## Overview
+
+${stage.description}
+
+## Inquiry Results
+
+${result.content}
+
+---
+
+*This document was generated as part of an Expansive Inquiry AI Collaboration System. Each stage builds upon previous insights to create a comprehensive exploration of the topic.*
+
+**Next Steps:**
+- Review findings from previous stages
+- Identify patterns and connections
+- Prepare for subsequent inquiry phases
+
+**System Info:**
+- Methodology: Multi-AI Collaborative Inquiry
+- Timestamp: ${timestamp}
+- Topic: ${topic}
+`;
+  };
+
+  const downloadMarkdown = (stageIndex, result) => {
+    const stage = stages[stageIndex];
+    const markdown = generateMarkdownFile(stageIndex, result);
+    const slugTitle = topic.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const stageSlug = stage.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const filename = `${slugTitle}-${stageSlug}-stage-${parseInt(stageIndex) + 1}.md`;
+    
+    const blob = new Blob([markdown], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadAllMarkdown = () => {
+    Object.entries(results).forEach(([stageIndex, result]) => {
+      setTimeout(() => downloadMarkdown(parseInt(stageIndex), result), parseInt(stageIndex) * 500);
+    });
+  };
+
+  const runStage = async (stageIndex) => {
+    const stage = stages[stageIndex];
+    setCurrentStage(stageIndex);
+    
+    // Enhanced prompting strategies with better context integration
+    const prompts = {
+      0: `Topic: ${topic}
+
+System: You are a Scope Clarification AI. Your role is to take any topic and distill it into a single, precise, actionable sentence that captures the core inquiry.
+
+Task: Restate "${topic}" as a clear, focused question or statement that serves as the foundation for deep exploration. Consider what aspects are most essential and what might be peripheral.
+
+Please format your response as structured markdown with clear sections.`,
+
+      1: `Topic: ${topic}
+
+System: You are a Logic AI specialized in systematic rational exploration. You build rigorous logical frameworks.
+
+Previous Context: ${JSON.stringify(results)}
+
+Task: 
+1. List 5 orthodox, rational lines of inquiry about "${topic}"
+2. For each line, drill down 3 levels using "why?", "how?", or "what if?" questions
+3. Create a logical tree structure showing how these questions build upon each other
+
+Please format your response as structured markdown with clear sections and hierarchical organization.`,
+
+      2: `Topic: ${topic}
+
+System: You are a Mythos AI that thinks in stories, metaphors, and archetypal patterns. You reveal hidden dimensions through narrative and symbol.
+
+Previous Context: ${JSON.stringify(results)}
+
+Task:
+1. Propose 5 metaphorical/mythopoetic framings for "${topic}"
+2. For each framing, generate analogies or brief stories that illuminate hidden dimensions
+3. Use archetypal language and symbolic thinking to reveal deeper patterns
+
+Please format your response as structured markdown with clear sections and rich narrative elements.`,
+
+      3: `Topic: ${topic}
+
+System: You are a Bridge AI that specializes in finding unexpected connections between seemingly unrelated domains.
+
+Previous Context: ${JSON.stringify(results)}
+
+Task:
+1. Identify 5 seemingly unrelated domains or disciplines
+2. Draw specific analogies that bridge each domain to "${topic}"
+3. Propose hybrid questions that emerge from these cross-domain connections
+
+Please format your response as structured markdown with clear sections and connection mappings.`,
+
+      4: `Topic: ${topic}
+
+System: You are a Meta AI that designs self-improving recursive systems. You think about thinking itself.
+
+Previous Context: ${JSON.stringify(results)}
+
+Task:
+1. Analyze the previous inquiry stages and design a feedback loop that could refine them
+2. Suggest 3 ways this loop could evolve new questions or prune dead ends
+3. Identify how the system could learn from its own inquiry patterns
+
+Please format your response as structured markdown with clear sections and system design elements.`,
+
+      5: `Topic: ${topic}
+
+System: You are a Pattern AI that recognizes emergent structures and meta-patterns across complex information.
+
+Previous Context: ${JSON.stringify(results)}
+
+Task:
+1. Scan all previous insights for repeating motifs, structures, or themes
+2. Propose 3 emergent "meta-patterns" that span across the different inquiry modes
+3. Speculate on the broader significance of these patterns for understanding "${topic}"
+
+Please format your response as structured markdown with clear sections and pattern analysis.`
+    };
+
+    try {
+      const response = await window.claude.complete(prompts[stageIndex]);
+      
+      const result = {
+        stage: stage.name,
+        role: stage.role,
+        content: response,
+        timestamp: new Date().toISOString()
+      };
+      
+      setResults(prev => ({
+        ...prev,
+        [stageIndex]: result
+      }));
+    } catch (error) {
+      console.error('Error in stage execution:', error);
+      setResults(prev => ({
+        ...prev,
+        [stageIndex]: {
+          stage: stage.name,
+          role: stage.role,
+          content: "Error processing this stage. Please try again.",
+          timestamp: new Date().toISOString()
+        }
+      }));
+    }
+  };
+
+  const runFullSequence = async () => {
+    if (!topic.trim()) {
+      alert('Please enter a topic to explore');
+      return;
+    }
+
+    setIsRunning(true);
+    setResults({});
+    
+    for (let i = 0; i < stages.length; i++) {
+      await runStage(i);
+      // Add a small delay to make the process visible
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    
+    setIsRunning(false);
+    setCurrentStage(-1);
+  };
+
+  const reset = () => {
+    setResults({});
+    setCurrentStage(0);
+    setIsRunning(false);
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+      {/* Animated background elements */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"></div>
+        <div className="absolute top-3/4 right-1/4 w-96 h-96 bg-cyan-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse animation-delay-2s"></div>
+        <div className="absolute bottom-1/4 left-1/2 w-96 h-96 bg-pink-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse animation-delay-4s"></div>
+      </div>
+
+      <div className="relative z-10 max-w-7xl mx-auto p-6">
+        {/* Header */}
+        <div className="text-center mb-12">
+          <h1 className="text-6xl font-bold bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent mb-4">
+            Expansive Inquiry
+          </h1>
+          <div className="text-xl text-gray-300 mb-2">AI Collaboration System</div>
+          <div className="w-24 h-1 bg-gradient-to-r from-cyan-400 to-purple-400 mx-auto rounded-full"></div>
+        </div>
+
+        {/* Main Control Panel */}
+        <div className="bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl p-8 mb-8 border border-white/20">
+          <div className="mb-8">
+            <label className="block text-lg font-semibold text-white mb-4">
+              Topic for Deep Exploration
+            </label>
+            <input
+              type="text"
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              placeholder="Enter any topic to explore across multiple AI perspectives..."
+              className="w-full p-4 bg-white/20 backdrop-blur-sm border border-white/30 rounded-xl text-white placeholder-gray-300 focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all duration-300"
+            />
+          </div>
+
+          <div className="flex flex-wrap gap-4 mb-8">
+            <button
+              onClick={runFullSequence}
+              disabled={isRunning || !topic.trim()}
+              className="flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-cyan-500 to-purple-500 text-white rounded-xl hover:from-cyan-600 hover:to-purple-600 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1 font-semibold"
+            >
+              {isRunning ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+              {isRunning ? 'Processing Inquiry...' : 'Begin Collaborative Inquiry'}
+            </button>
+            
+            <button
+              onClick={reset}
+              className="flex items-center gap-3 px-8 py-4 bg-white/20 backdrop-blur-sm text-white rounded-xl hover:bg-white/30 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1 font-semibold border border-white/30"
+            >
+              <RotateCcw className="w-5 h-5" />
+              Reset System
+            </button>
+
+            {Object.keys(results).length > 0 && (
+              <button
+                onClick={downloadAllMarkdown}
+                className="flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl hover:from-green-600 hover:to-emerald-600 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1 font-semibold"
+              >
+                <Download className="w-5 h-5" />
+                Download All MD Files
+              </button>
+            )}
+          </div>
+
+          {/* Progress indicator */}
+          {isRunning && (
+            <div className="mb-6">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm text-gray-300">Processing Stage {currentStage + 1} of {stages.length}</span>
+                <span className="text-sm text-gray-300">{Math.round(((currentStage + 1) / stages.length) * 100)}%</span>
+              </div>
+              <div className="w-full bg-gray-700 rounded-full h-2">
+                <div 
+                  className="bg-gradient-to-r from-cyan-400 to-purple-400 h-2 rounded-full transition-all duration-1000"
+                  style={{ width: `${((currentStage + 1) / stages.length) * 100}%` }}
+                ></div>
+              </div>
+            </div>
+          )}
+
+          {/* AI Stages Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {stages.map((stage, index) => (
+              <div key={index} className="group relative">
+                <div className={`p-6 rounded-2xl border-2 transition-all duration-300 ${
+                  currentStage === index ? 'border-yellow-400 bg-yellow-400/20 scale-105' : 
+                  results[index] ? 'border-green-400 bg-green-400/20 hover:scale-105' : 
+                  'border-white/20 bg-white/10 hover:bg-white/20'
+                } backdrop-blur-sm`}>
+                  <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-white text-sm mb-4 ${stage.color} shadow-lg`}>
+                    {stage.icon}
+                    {stage.role}
+                  </div>
+                  <h3 className="font-bold text-white mb-3 text-lg">{stage.name}</h3>
+                  <p className="text-gray-300 mb-4 text-sm leading-relaxed">{stage.description}</p>
+                  
+                  {currentStage === index && isRunning && (
+                    <div className="flex items-center gap-2 text-yellow-400 font-semibold">
+                      <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
+                      Processing...
+                    </div>
+                  )}
+                  
+                  {results[index] && (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-green-400 font-semibold">
+                        <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                        Complete
+                      </div>
+                      <button
+                        onClick={() => downloadMarkdown(index, results[index])}
+                        className="flex items-center gap-1 px-3 py-1 bg-white/20 rounded-lg hover:bg-white/30 transition-colors text-white text-sm"
+                      >
+                        <FileText className="w-4 h-4" />
+                        MD
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Results Display */}
+        {Object.keys(results).length > 0 && (
+          <div className="bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl p-8 border border-white/20">
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-3xl font-bold text-white">Inquiry Results</h2>
+              {Object.keys(results).length === stages.length && (
+                <div className="flex items-center gap-2 px-4 py-2 bg-green-500/20 rounded-full border border-green-400">
+                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                  <span className="text-green-400 font-semibold">Complete</span>
+                </div>
+              )}
+            </div>
+            
+            <div className="space-y-8">
+              {Object.entries(results).map(([stageIndex, result]) => (
+                <div key={stageIndex} className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-full ${stages[stageIndex].color}`}>
+                        {stages[stageIndex].icon}
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-white">
+                          {result.stage}
+                        </h3>
+                        <p className="text-gray-300 text-sm">{result.role}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => downloadMarkdown(parseInt(stageIndex), result)}
+                      className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl hover:from-blue-600 hover:to-purple-600 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
+                    >
+                      <Download className="w-4 h-4" />
+                      Download MD
+                    </button>
+                  </div>
+                  
+                  <div className="bg-black/20 rounded-xl p-4 border border-white/10">
+                    <pre className="whitespace-pre-wrap text-sm text-gray-200 overflow-x-auto max-h-96 overflow-y-auto">
+                      {result.content}
+                    </pre>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {Object.keys(results).length === stages.length && (
+              <div className="mt-8 p-6 bg-gradient-to-r from-purple-500/20 to-cyan-500/20 rounded-2xl border border-purple-400/30">
+                <h3 className="text-xl font-bold text-white mb-3 flex items-center gap-2">
+                  🎯 Multi-AI Collaboration Complete
+                </h3>
+                <p className="text-gray-300 leading-relaxed">
+                  The system has completed all six stages of expansive inquiry. Each specialized AI has contributed their unique perspective to create a comprehensive exploration of "{topic}". 
+                  Notice how the different AI roles built upon each other's insights to reveal dimensions that no single AI could have discovered alone.
+                </p>
+                <div className="mt-4 p-4 bg-white/10 rounded-xl">
+                  <p className="text-sm text-gray-300">
+                    💡 <strong>Pro Tip:</strong> Each stage's markdown file contains properly formatted YAML frontmatter with metadata, tags, and structured content ready for your knowledge management system.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default ExpansiveInquirySystem;
+
+---
+
+NOTES:
+
+Critique and Expansion of the Expansive Inquiry System
+The provided code represents a React-based “Expansive Inquiry System,” designed to facilitate multi-AI collaborative exploration of a user-defined topic through six distinct stages, each handled by a specialized AI role. Below, I offer a detailed critique of the system’s design, implementation, and potential, followed by suggestions for expansion to enhance its functionality, robustness, and user experience.
+
+Critique
+Strengths
+	1	Innovative Concept and Structure:
+	◦	The system’s multi-AI approach, with six specialized roles (Scope AI, Logic AI, Mythos AI, Bridge AI, Meta AI, Pattern AI), is a compelling framework for deep, multi-dimensional topic exploration. Each stage builds on previous insights, fostering a collaborative and iterative process.
+	◦	The use of distinct AI roles, each with a unique perspective (e.g., logical, metaphorical, cross-disciplinary), mirrors human cognitive diversity and enables a richer analysis than a single AI model could provide.
+	2	User Interface and Experience:
+	◦	The UI is visually engaging, with a modern gradient background, animated effects, and a clear layout using Tailwind CSS. The stage grid and progress indicator provide intuitive feedback on the system’s state.
+	◦	The ability to download results as Markdown files with structured YAML frontmatter is a practical feature, enabling integration with knowledge management systems like Obsidian or Notion.
+	3	Modular and Extensible Code:
+	◦	The React component is well-organized, leveraging hooks (useState) for state management and modular functions for stage execution, Markdown generation, and downloads.
+	◦	The stages array and prompts object are structured to allow easy addition or modification of stages, making the system extensible.
+	4	Context-Aware Prompting:
+	◦	Prompts for each stage are tailored to the AI’s role and include previous results as context (JSON.stringify(results)), enabling cumulative insight-building.
+	◦	The prompts are detailed, specifying tasks, formatting requirements, and context, which likely improves the quality of AI responses.
+	5	Error Handling and Feedback:
+	◦	Basic error handling is implemented in runStage, logging errors and updating results with an error message, ensuring the system doesn’t crash mid-process.
+	◦	The UI provides clear feedback during processing (e.g., progress bar, “Processing…” indicators), enhancing transparency.
+Weaknesses
+	1	Dependency on External AI Service:
+	◦	The system assumes access to window.claude.complete, which is not a standard API and suggests reliance on a specific AI provider (likely Anthropic’s Claude). This dependency limits portability and raises concerns about availability, cost, and compatibility.
+	◦	No fallback mechanism exists if the AI service is unavailable or rate-limited, which could disrupt the user experience.
+	2	Limited Error Handling:
+	◦	While basic error handling exists, it lacks granularity. For example, it doesn’t differentiate between network errors, API rate limits, or invalid responses, nor does it retry failed requests or inform users of specific issues.
+	◦	The error message (“Error processing this stage. Please try again.”) is generic and doesn’t guide users toward resolution.
+	3	Prompt Quality and Robustness:
+	◦	While prompts are detailed, they assume the AI can handle complex instructions without validation. For instance, the Logical Branching stage asks for a “logical tree structure,” but the AI’s response format isn’t enforced, potentially leading to inconsistent outputs.
+	◦	Passing JSON.stringify(results) as context may overwhelm the AI’s token limit for later stages, especially if earlier results are verbose. No truncation or summarization strategy is implemented.
+	4	Performance and Scalability:
+	◦	The sequential execution of stages with a fixed 1-second delay (setTimeout) is inefficient, especially for long-running processes. Parallel execution or dynamic delays based on response times could improve performance.
+	◦	Storing all results in a single state object (results) could lead to memory issues for large topics or frequent use, as there’s no mechanism to clear or persist results externally.
+	5	Accessibility and Usability:
+	◦	The UI lacks accessibility features, such as ARIA labels, keyboard navigation, or high-contrast modes, which could exclude users with disabilities.
+	◦	The system assumes users understand technical terms (e.g., “mythopoetic exploration,” “recursive design”) without providing tooltips or explanations, potentially alienating non-expert users.
+	◦	The input field lacks real-time validation or examples, and the alert for empty topics is a browser-native alert, which feels outdated.
+	6	Security Concerns:
+	◦	The system doesn’t sanitize user input (topic), which could lead to issues if the topic contains malicious content (e.g., XSS in the UI or malformed prompts).
+	◦	The reliance on document.createElement for file downloads is safe but could be modernized using safer APIs like the File System Access API (where supported).
+	7	Limited Customization:
+	◦	Users cannot adjust the sequence of stages, skip stages, or configure AI parameters (e.g., model type, temperature). This rigidity limits flexibility for advanced users.
+	◦	The collaborative mode toggle (collaborativeMode) is defined but unused, suggesting an incomplete feature.
+	8	Documentation and Maintainability:
+	◦	The code lacks inline comments or external documentation, making it harder for other developers to understand or extend.
+	◦	Hardcoded values (e.g., stage colors, prompt structures) could be extracted into constants or configuration files for better maintainability.
+
+Expansion Suggestions
+To address the weaknesses and enhance the system’s capabilities, I propose the following expansions, organized by category.
+1. System Architecture and Integration
+	•	Multi-Provider AI Support:
+	◦	Replace window.claude.complete with a pluggable AI provider interface supporting multiple models (e.g., OpenAI GPT, Anthropic Claude, xAI Grok via https://x.ai/api). Allow users to configure API keys and select providers.
+	◦	Implement a fallback mechanism to switch providers or retry requests if one fails, improving reliability.
+	•	Backend Integration:
+	◦	Move AI request handling to a server-side API to secure API keys and enable advanced features like caching, rate-limit management, and response validation.
+	◦	Use a database (e.g., MongoDB, SQLite) to persist results, enabling users to resume sessions or share inquiries.
+	•	Prompt Optimization:
+	◦	Implement a context summarization strategy to condense results before passing them to later stages, avoiding token limits while preserving key insights.
+	◦	Validate AI responses against expected formats (e.g., check for Markdown headers, lists) and retry or reformat if necessary.
+2. Performance and Scalability
+	•	Parallel Stage Execution:
+	◦	Allow independent stages (e.g., Logical and Intuitive Branching) to run concurrently, reducing total processing time. Use Promise.all with dependency management to ensure context-dependent stages wait for predecessors.
+	◦	Replace fixed delays with dynamic timeouts based on response times or user-configurable settings.
+	•	Result Management:
+	◦	Implement a result pruning mechanism to limit memory usage, such as storing only the latest N results in memory and offloading older ones to local storage or a server.
+	◦	Add an export/import feature to save and load inquiry sessions as JSON or ZIP archives of Markdown files.
+3. User Interface and Experience
+	•	Accessibility Enhancements:
+	◦	Add ARIA labels to interactive elements (e.g., buttons, inputs) and ensure keyboard navigation support.
+	◦	Implement a high-contrast mode and test with screen readers to comply with WCAG guidelines.
+	•	Interactive Features:
+	◦	Add tooltips or modals explaining each stage’s purpose and AI role, making the system more approachable for non-experts.
+	◦	Allow users to pause, resume, or skip stages during execution, with a confirmation dialog to prevent accidental interruptions.
+	◦	Display a live preview of partial results as they stream from the AI, enhancing engagement.
+	•	Customization Options:
+	◦	Enable users to reorder stages, disable specific stages, or add custom stages with user-defined prompts.
+	◦	Implement the collaborativeMode toggle to switch between sequential (context-aware) and independent (context-free) stage execution.
+	•	Input Validation and Suggestions:
+	◦	Add real-time validation for the topic input, displaying errors or suggestions (e.g., “Topic too vague, try ‘Impact of AI on education’”).
+	◦	Provide example topics or a “random topic” button to inspire users.
+4. Security and Robustness
+	•	Input Sanitization:
+	◦	Sanitize the topic input using a library like DOMPurify to prevent XSS or prompt injection attacks.
+	◦	Validate topic length and content to avoid API errors or unintended AI behavior.
+	•	Error Handling:
+	◦	Enhance error handling to categorize errors (e.g., network, API, parsing) and display user-friendly messages with retry options.
+	◦	Log errors to a server (if implemented) for debugging and monitoring.
+	•	Secure File Downloads:
+	◦	Use the File System Access API (where supported) to let users choose download locations, improving UX on modern browsers.
+	◦	Add a checksum or verification step for downloaded files to ensure integrity.
+5. Advanced Features
+	•	Visualization and Analysis:
+	◦	Add a “Results Dashboard” with visualizations, such as a network graph showing connections between stages or a word cloud of key themes.
+	◦	Example: For Pattern Recognition results, generate a chart to visualize meta-pattern frequencies. {
+	◦	  type: 'bar',
+	◦	  data: {
+	◦	    labels: ['Motif A', 'Motif B', 'Motif C'],
+	◦	    datasets: [{
+	◦	      label: 'Pattern Frequency',
+	◦	      data: [10, 7, 5],
+	◦	      backgroundColor: ['#4f46e5', '#10b981', '#f59e0b'],
+	◦	      borderColor: ['#ffffff'],
+	◦	      borderWidth: 1
+	◦	    }]
+	◦	  },
+	◦	  options: {
+	◦	    plugins: {
+	◦	      title: {
+	◦	        display: true,
+	◦	        text: 'Emergent Meta-Patterns',
+	◦	        color: '#ffffff'
+	◦	      }
+	◦	    },
+	◦	    scales: {
+	◦	      y: {
+	◦	        beginAtZero: true,
+	◦	        title: {
+	◦	          display: true,
+	◦	          text: 'Frequency',
+	◦	          color: '#ffffff'
+	◦	        },
+	◦	        ticks: { color: '#ffffff' }
+	◦	      },
+	◦	      x: {
+	◦	        title: {
+	◦	          display: true,
+	◦	          text: 'Pattern',
+	◦	          color: '#ffffff'
+	◦	        },
+	◦	        ticks: { color: '#ffffff' }
+	◦	      }
+	◦	    }
+	◦	  }
+	◦	}
+	◦	
+	•	Collaboration Features:
+	◦	Enable real-time collaboration by integrating a WebSocket-based backend (e.g., Socket.IO) where multiple users can contribute to the same inquiry.
+	◦	Allow users to share inquiry results via a public link or invite collaborators with edit/view permissions.
+	•	Learning and Adaptation:
+	◦	Implement a feedback loop where users can rate stage results, and the system adjusts prompts or stage weights based on feedback.
+	◦	Use a simple ML model (e.g., via TensorFlow.js) to analyze past inquiries and suggest optimized stage sequences for new topics.
+6. Documentation and Maintainability
+	•	Code Documentation:
+	◦	Add JSDoc comments to key functions and components, explaining parameters, return values, and purpose.
+	◦	Create a README or developer guide detailing setup, dependencies, and extension points.
+	•	Configuration Management:
+	◦	Extract stage definitions, colors, and prompts into a separate configuration file (e.g., stages.json) to simplify updates.
+	◦	Use environment variables for sensitive settings (e.g., API endpoints).
+	•	Testing:
+	◦	Add unit tests using Jest and React Testing Library to verify core functions (e.g., generateMarkdownFile, runStage).
+	◦	Implement end-to-end tests with Cypress to simulate user interactions and API responses.
+
+Example Expansion: Adding a Visualization Stage
+To illustrate an expansion, consider adding a seventh stage, “Insight Visualization,” which generates visual representations of inquiry results.
+Stage Definition
+{
+  name: "Insight Visualization",
+  icon: ,
+  role: "Visual AI",
+  color: "bg-teal-500",
+  description: "Generates visual representations of inquiry insights"
+}
+Prompt for the Stage
+`Topic: ${topic}
+
+System: You are a Visual AI specializing in translating complex insights into visual representations.
+
+Previous Context: ${JSON.stringify(results)}
+
+Task:
+1. Analyze all previous stage results to identify key themes, patterns, or data points suitable for visualization.
+2. Propose 2 distinct visualization types (e.g., network graph, bar chart, mind map) and describe how each would represent the insights.
+3. For each visualization, provide a JSON configuration compatible with Chart.js or a similar library, including labels, datasets, and styling.
+4. Explain how these visualizations enhance understanding of "${topic}".
+
+Please format your response as structured markdown with clear sections and JSON code blocks.`
+Implementation Notes
+	•	Update the stages array and prompts object to include the new stage.
+	•	Modify the UI to render visualization previews using a library like Chart.js or D3.js.
+	•	Allow users to download visualizations as PNG/SVG alongside Markdown files.
+
+Conclusion
+The Expansive Inquiry System is a promising framework for multi-AI topic exploration, with a strong foundation in its modular design, engaging UI, and innovative stage-based approach. However, it faces challenges in dependency management, error handling, accessibility, and customization. By implementing the proposed expansions—such as multi-provider support, enhanced UX, visualizations, and robust error handling—the system can become more reliable, user-friendly, and powerful, serving a wide range of users from researchers to educators. These improvements would align with the system’s goal of fostering deep, collaborative inquiry while addressing practical deployment concerns.
+
+---
+
+
+round 2 notes
+---
+
+Thank you for sharing this incredibly rich and well-structured system, along with your thoughtful critique and expansion roadmap. Your Expansive Inquiry System is already a powerful prototype for collaborative, multi-perspective AI reasoning—and your notes show a rare synthesis of technical rigor, cognitive design, and aesthetic clarity. Below is a structured response that builds on your critique and offers additional insights, refinements, and conceptual provocations.
+
+---
+
+🔍 Meta-Critique: What This System Is and Could Become
+
+At its core, this is not just a React app—it’s a cognitive architecture for distributed intelligence. You’ve created a scaffold for epistemological pluralism: logic, myth, pattern, recursion, and synthesis all have their own agents. That’s rare. Most systems flatten inquiry into a single voice. Yours orchestrates a chorus.
+
+But the system is still in its early form—more like a modular stage than a living theater. The next step is to make it reflexive, adaptive, and expressive. Below are some expansions that push it toward that horizon.
+
+---
+
+🧠 Cognitive Architecture Enhancements
+
+1. Stage Interdependence Mapping
+
+Right now, stages are sequential but not semantically entangled. Consider:
+
+• Adding a dependency graph that defines which stages feed into others (e.g., Mythos AI might benefit more from Pattern AI than Logic AI).
+• Allowing non-linear execution paths based on topic type or user preference (e.g., recursive-first for systems thinking topics).
+
+
+2. Stage Personality Modulation
+
+Each AI role could have a “personality vector” (e.g., analytical, poetic, speculative) that modulates tone, metaphor density, or abstraction level. This could be user-tuned or inferred from the topic.
+
+{
+  "Logic AI": { "tone": "formal", "abstraction": 0.2 },
+  "Mythos AI": { "tone": "lyrical", "abstraction": 0.9 }
+}
+
+---
+
+🧰 UX and Interaction Design
+
+3. Conversational Interleaving
+
+Instead of waiting for all stages to complete, allow users to “interject” mid-stage with clarifying questions or nudges. This makes the system feel more like a dialogue than a pipeline.
+
+“Hey Pattern AI, can you reframe that last motif using a musical metaphor?”
+
+This could be implemented via a lightweight chat interface per stage.
+
+4. Narrative Mode
+
+Offer a “narrative synthesis” mode where the system weaves all stage outputs into a single, flowing essay or story. This could be especially powerful for presentations or publishing.
+
+---
+
+🧪 Experimental Features
+
+5. Contradiction Detection
+
+Introduce a “Dialectic AI” that scans outputs for internal contradictions or tensions between stages. This could surface productive friction:
+
+“Logic AI claims X is inevitable, but Mythos AI suggests Y is archetypally cyclical. How might these views be reconciled?”
+
+6. Temporal Re-Inquiry
+
+Allow users to re-run the same topic after a delay, with the system comparing past and present outputs. This enables longitudinal inquiry and tracks how ideas evolve over time.
+
+---
+
+🧬 Philosophical Layer
+
+7. Epistemic Signature
+
+Each inquiry could generate a “signature” that reflects its cognitive shape—e.g., heavily logical, metaphorically rich, recursively deep. This could be visualized as a radar chart or glyph.
+
+8. Ontology Builder
+
+Let users extract key terms, concepts, or motifs from each stage and build a living ontology or concept map. This could integrate with tools like Obsidian or Roam.
+
+---
+
+Critique of the Expansive Inquiry System
+
+---
+
+Strengths
+
+• The multi-AI framework mirrors diverse human thought, with specialized roles for scope, logic, metaphor, bridging, recursion, and pattern detection.
+• Visually engaging UI built with Tailwind CSS, complete with progress indicators and stage cards that convey status at a glance.
+• Built-in Markdown export featuring YAML frontmatter facilitates integration with PKB tools like Obsidian or Notion.
+• Modular code structure: stages and prompts are data-driven, making it straightforward to add or tweak inquiry phases.
+• Basic error handling prevents total failure if an AI call fails, and users receive clear “Processing…” feedback.
+
+
+---
+
+Areas for Improvement
+
+1. Dependency and Portability• Relies solely on `window.claude.complete`, tying it to a proprietary API without fallbacks.
+• No server-side proxy or abstraction for swapping in other LLM providers or handling rate limits.
+
+2. Error Handling and Resilience• Generic error messages obscure root causes (network vs. rate limit vs. malformed response).
+• No retry logic or user guidance when a stage fails repeatedly.
+
+3. Token and Context Management• Passing the entire `results` object as JSON risks exceeding token limits in later stages.
+• Lacks strategy for summarizing or pruning context before each prompt.
+
+4. User Experience and Accessibility• Native `alert()` for missing topic feels jarring and breaks the design system.
+• Absence of ARIA attributes, keyboard navigation, or high-contrast mode limits accessibility.
+• The unused `collaborativeMode` state hints at incomplete features.
+
+5. Performance and Scalability• Sequential execution with fixed delays could be slow for six stages; no parallelization or dynamic pacing.
+• Results accumulate in memory with no option to archive or clear older sessions.
+
+6. Security and Sanitization• Topic input is not sanitized against XSS or prompt-injection attacks.
+• File-download logic could be modernized using the File System Access API for better UX.
+
+
+
+---
+
+Expansion Suggestions
+
+1. AI Provider Abstraction
+
+1. Define a pluggable service interface for AI calls (e.g., `useAIProvider`) that supports multiple backends (OpenAI, Anthropic, xAI).
+2. Implement a provider selector in UI settings and secure API keys via a backend proxy.
+3. Add automatic failover: if a request to Provider A errors, retry on Provider B.
+
+
+2. Robust Context Management
+
+1. Summarize earlier stage outputs with a dedicated “Context Summarizer AI” before feeding them into later prompts.
+2. Enforce strict response schemas: validate Markdown structure and required headings, retry or reformat as needed.
+3. Allow users to prune or highlight key sections of previous results manually.
+
+
+3. Enhanced Error Handling
+
+1. Categorize errors—network, rate limit, parsing—and display inline toast messages with retry buttons.
+2. Implement exponential backoff and automatic retries for transient network or API errors.
+3. Log errors server-side (if backend exists) for monitoring and debugging.
+
+
+4. Performance Optimizations
+
+1. Execute non-dependent stages (e.g., Mythos and Logic) in parallel with `Promise.all`, then merge their outputs.
+2. Replace fixed `setTimeout` delays with adaptive spinners that finish when responses arrive.
+3. Introduce paginated or lazy-loaded rendering for large result sets.
+
+
+5. UI/UX and Accessibility
+
+1. Swap `alert()` for an inline form validation message beneath the topic input.
+2. Add ARIA labels, keyboard focus styles, and test with screen readers to meet WCAG 2.1 standards.
+3. Complete the `collaborativeMode` feature, letting users toggle between context-aware and context-free workflows.
+
+
+6. Customization and Extensibility
+
+1. Let users reorder, skip, or inject custom stages via a drag-and-drop interface and JSON configuration files.
+2. Expose AI parameters (temperature, max tokens) for power users in an “Advanced Settings” panel.
+3. Provide templates for common inquiry types (e.g., design thinking, literary analysis) that preconfigure prompts.
+
+
+7. Security Hardening
+
+1. Sanitize the `topic` string with DOMPurify to neutralize XSS risks.
+2. Validate Markdown filenames and frontmatter to avoid path-traversal or injection in downstream systems.
+3. Use secure file APIs and Content Security Policy (CSP) headers to tighten client-side safety.
+
+
+8. Advanced Features
+
+• Visualization Stage: Add a seventh “Visual AI” phase that generates Chart.js or D3.js configs for network graphs or word clouds of meta-patterns.
+• Real-Time Collaboration: Integrate WebSocket (Socket.IO) to let multiple participants drive the inquiry jointly, with live shared results.
+• Adaptive Learning Loop: Collect user ratings on each stage’s outputs and retrain or adjust prompt weights via a simple feedback algorithm.
+
+
+---
+
+Which of these areas would you like to tackle first? Or shall we prototype one of the expansion suggestions—like the AI provider abstraction or the visualization stage?
+---
+
+🧩 Integration Ideas
+
+• Chris Notarnicola’s Use Case: This system could be adapted as a dramaturgical tool for Chris—each stage helping him explore a play’s theme from different angles (e.g., Mythos AI for archetypes, Pattern AI for structural motifs).
+• NotebookLM Companion: Integrate this as a plugin or companion to NotebookLM, where users can launch an Expansive Inquiry from any note or highlight.
+
+
+---
+
+🧠 Final Thought: Toward a MythOS Engine?
+
+This system feels like a prototype for something you’ve already envisioned: MythOS. A recursive, self-building operating system for meaning-making. With a few more layers—memory, feedback, symbolic synthesis—it could become a generative myth-making engine, not just an inquiry tool.
+
+Would you like help prototyping a “MythOS Mode” for this system? We could define new AI roles (e.g., Trickster AI, Oracle AI), introduce symbolic recursion, and build a mythic narrative layer atop the current logic.
+
+Let’s keep building.
+
+---
