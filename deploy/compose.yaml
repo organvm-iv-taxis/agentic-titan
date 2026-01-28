@@ -250,7 +250,7 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile.worker
-    container_name: titan-celery-worker
+    # Note: container_name removed to allow replicas
     command: celery -A titan.batch.celery_app worker --loglevel=INFO --concurrency=3
     environment:
       - CELERY_BROKER_URL=redis://redis:6379/1

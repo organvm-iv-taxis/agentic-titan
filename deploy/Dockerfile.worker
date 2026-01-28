@@ -20,9 +20,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for caching
-COPY pyproject.toml setup.py ./
-COPY requirements*.txt ./
+# Copy pyproject.toml for dependency info
+COPY pyproject.toml ./
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -U pip setuptools wheel && \
@@ -32,7 +31,10 @@ RUN pip install --no-cache-dir -U pip setuptools wheel && \
     boto3>=1.34.0 \
     psutil>=5.9.0 \
     pydantic>=2.0.0 \
-    httpx>=0.25.0
+    httpx>=0.25.0 \
+    anthropic>=0.40.0 \
+    openai>=1.50.0 \
+    pyyaml>=6.0
 
 # Copy application code
 COPY titan/ ./titan/
