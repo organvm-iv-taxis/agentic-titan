@@ -55,6 +55,8 @@ from hive.neighborhood import (
     InteractionType,
     AgentProfile,
     NeighborScore,
+    NeighborLayer,
+    LayeredNeighborConfig,
 )
 from hive.topology_extended import (
     ExtendedTopologyType,
@@ -80,6 +82,24 @@ from hive.machines import (
     MachineState,
     MachineOperation,
     OperationType,
+)
+from hive.criticality import (
+    CriticalityMonitor,
+    CriticalityState,
+    CriticalityMetrics,
+    PhaseTransition,
+)
+from hive.fission_fusion import (
+    FissionFusionManager,
+    FissionFusionState,
+    FissionFusionMetrics,
+    Cluster,
+)
+from hive.information_center import (
+    InformationCenterManager,
+    InformationCenter,
+    InformationCenterRole,
+    LearnedPattern,
 )
 
 __all__ = [
@@ -124,6 +144,8 @@ __all__ = [
     "InteractionType",
     "AgentProfile",
     "NeighborScore",
+    "NeighborLayer",
+    "LayeredNeighborConfig",
     # Extended Topologies
     "ExtendedTopologyType",
     "RhizomaticTopology",
@@ -146,4 +168,19 @@ __all__ = [
     "MachineState",
     "MachineOperation",
     "OperationType",
+    # Criticality (Phase 16)
+    "CriticalityMonitor",
+    "CriticalityState",
+    "CriticalityMetrics",
+    "PhaseTransition",
+    # Fission-Fusion (Phase 16)
+    "FissionFusionManager",
+    "FissionFusionState",
+    "FissionFusionMetrics",
+    "Cluster",
+    # Information Centers (Phase 16)
+    "InformationCenterManager",
+    "InformationCenter",
+    "InformationCenterRole",
+    "LearnedPattern",
 ]

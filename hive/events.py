@@ -83,6 +83,29 @@ class EventType(str, Enum):
     CELL_SIGNAL_SENT = "cell.signal.sent"
     CELL_DIFFERENTIATED = "cell.differentiated"
 
+    # Criticality events (Phase 16)
+    CRITICALITY_MEASURED = "criticality.measured"
+    PHASE_TRANSITION_DETECTED = "criticality.phase_transition"
+    CRITICALITY_INTERVENTION = "criticality.intervention"
+
+    # Fission-fusion events (Phase 16)
+    FISSION_INITIATED = "fission_fusion.fission.initiated"
+    FISSION_COMPLETED = "fission_fusion.fission.completed"
+    FUSION_INITIATED = "fission_fusion.fusion.initiated"
+    FUSION_COMPLETED = "fission_fusion.fusion.completed"
+
+    # War machine events (Phase 16)
+    SMOOTH_OPERATION = "machine.smooth"
+    NOMADIZE_OPERATION = "machine.nomadize"
+    DETERRITORIALIZE_OPERATION = "machine.deterritorialize"
+
+    # Information center events (Phase 16)
+    INFO_CENTER_CREATED = "info_center.created"
+    INFO_CENTER_ELECTED = "info_center.elected"
+    PATTERN_AGGREGATED = "info_center.pattern.aggregated"
+    PATTERN_BROADCAST = "info_center.pattern.broadcast"
+    GENERATION_ARCHIVED = "info_center.generation.archived"
+
 
 @dataclass
 class Event:

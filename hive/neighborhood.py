@@ -27,6 +27,30 @@ logger = logging.getLogger("titan.hive.neighborhood")
 DEFAULT_NEIGHBOR_COUNT = 7
 
 
+class NeighborLayer(str, Enum):
+    """Layers of topological coupling based on murmuration research.
+
+    Multi-scale coupling allows systems to have:
+    - Strong local interactions (primary)
+    - Weaker medium-range correlations (secondary)
+    - Rare global events (tertiary)
+    """
+
+    PRIMARY = "primary"      # 6-7 neighbors, strong coupling (main interactions)
+    SECONDARY = "secondary"  # 20-30 neighbors, weak coupling (information spread)
+    TERTIARY = "tertiary"    # Global, rare events only (emergency broadcast)
+
+
+@dataclass
+class LayeredNeighborConfig:
+    """Configuration for multi-scale neighbor layers."""
+
+    primary_count: int = 7          # N=7 from murmuration research
+    secondary_count: int = 25       # Weaker, broader connections
+    secondary_weight: float = 0.3   # Interaction strength for secondary
+    tertiary_probability: float = 0.05  # Probability of tertiary connection
+
+
 class InteractionType(str, Enum):
     """Types of agent-to-agent interactions."""
 
@@ -134,6 +158,7 @@ class TopologicalNeighborhood:
         task_weight: float = 0.3,
         recency_decay: float = 0.1,
         max_history: int = 1000,
+        layer_config: LayeredNeighborConfig | None = None,
     ) -> None:
         """Initialize the neighborhood manager.
 
@@ -144,6 +169,7 @@ class TopologicalNeighborhood:
             task_weight: Weight for task similarity.
             recency_decay: Decay factor for old interactions.
             max_history: Maximum interaction records to keep.
+            layer_config: Configuration for multi-scale neighbor layers.
         """
         self._neighbor_count = neighbor_count
         self._history_weight = history_weight
@@ -151,6 +177,7 @@ class TopologicalNeighborhood:
         self._task_weight = task_weight
         self._recency_decay = recency_decay
         self._max_history = max_history
+        self._layer_config = layer_config or LayeredNeighborConfig()
 
         # Agent profiles
         self._profiles: dict[str, AgentProfile] = {}
@@ -160,6 +187,8 @@ class TopologicalNeighborhood:
 
         # Cached neighbor lists (agent_id -> list of neighbor ids)
         self._neighbor_cache: dict[str, list[str]] = {}
+        # Layered neighbor caches
+        self._secondary_cache: dict[str, list[str]] = {}
         self._cache_valid = False
 
     @property
@@ -292,25 +321,107 @@ class TopologicalNeighborhood:
     def get_neighbors(
         self,
         agent_id: str,
+        layer: NeighborLayer = NeighborLayer.PRIMARY,
         force_recalculate: bool = False,
     ) -> list[str]:
         """Get the topological neighbors for an agent.
 
+        Multi-scale coupling based on murmuration research:
+        - PRIMARY: 6-7 neighbors, strong coupling
+        - SECONDARY: 20-30 neighbors, weak coupling
+        - TERTIARY: Global, rare events only
+
         Args:
             agent_id: Agent to get neighbors for.
+            layer: Which neighbor layer to retrieve.
             force_recalculate: Whether to force recalculation.
 
         Returns:
             List of neighbor agent IDs.
         """
-        if not force_recalculate and self._cache_valid:
-            if agent_id in self._neighbor_cache:
-                return self._neighbor_cache[agent_id]
+        if layer == NeighborLayer.PRIMARY:
+            if not force_recalculate and self._cache_valid:
+                if agent_id in self._neighbor_cache:
+                    return self._neighbor_cache[agent_id]
 
-        neighbors = self.calculate_neighbors(agent_id)
-        self._neighbor_cache[agent_id] = neighbors
+            neighbors = self.calculate_neighbors(agent_id)
+            self._neighbor_cache[agent_id] = neighbors
+            return neighbors
+
+        elif layer == NeighborLayer.SECONDARY:
+            if not force_recalculate and self._cache_valid:
+                if agent_id in self._secondary_cache:
+                    return self._secondary_cache[agent_id]
+
+            # Secondary layer: more neighbors with weaker connections
+            neighbors = self._calculate_secondary_neighbors(agent_id)
+            self._secondary_cache[agent_id] = neighbors
+            return neighbors
+
+        elif layer == NeighborLayer.TERTIARY:
+            # Tertiary layer: all agents with probability filter
+            return self._get_tertiary_neighbors(agent_id)
+
+        return []
+
+    def _calculate_secondary_neighbors(self, agent_id: str) -> list[str]:
+        """Calculate secondary (weak) neighbors for an agent.
+
+        Secondary neighbors are more numerous but with weaker coupling.
+        """
+        profile = self._profiles.get(agent_id)
+        if not profile:
+            return []
+
+        scores: list[NeighborScore] = []
+
+        for other_id, other_profile in self._profiles.items():
+            if other_id == agent_id or not other_profile.active:
+                continue
+
+            # Calculate scores (same as primary but take more)
+            collab_score = self._calculate_collaboration_score(agent_id, other_id)
+            cap_score = profile.capability_overlap(other_profile)
+            task_score = profile.task_similarity(other_profile)
+
+            total = (
+                self._history_weight * collab_score +
+                self._capability_weight * cap_score +
+                self._task_weight * task_score
+            )
+
+            scores.append(NeighborScore(
+                agent_id=other_id,
+                total_score=total,
+                collaboration_score=collab_score,
+                capability_score=cap_score,
+                task_similarity_score=task_score,
+            ))
+
+        # Sort by score and take top N (secondary count)
+        scores.sort(key=lambda x: x.total_score, reverse=True)
+        neighbors = [s.agent_id for s in scores[:self._layer_config.secondary_count]]
 
         return neighbors
+
+    def _get_tertiary_neighbors(self, agent_id: str) -> list[str]:
+        """Get tertiary (global, rare) neighbors.
+
+        Tertiary connections are used for emergency broadcasts or
+        rare global events. Selection is probabilistic.
+        """
+        all_agents = [
+            aid for aid, p in self._profiles.items()
+            if aid != agent_id and p.active
+        ]
+
+        # Probabilistic selection
+        selected = [
+            aid for aid in all_agents
+            if random.random() < self._layer_config.tertiary_probability
+        ]
+
+        return selected
 
     def calculate_neighbors(self, agent_id: str) -> list[str]:
         """Calculate topological neighbors for an agent.
@@ -453,6 +564,91 @@ class TopologicalNeighborhood:
         logger.debug(
             f"Propagated information from {source_agent}: "
             f"reached {len(reached)} agents in {max_hops} hops"
+        )
+
+        return reached
+
+    async def propagate_information_layered(
+        self,
+        source_agent: str,
+        information: dict[str, Any],
+        use_layers: list[NeighborLayer] | None = None,
+        perturbation_magnitude: float = 1.0,
+        max_hops: int = 3,
+        decay_factor: float = 0.7,
+    ) -> dict[str, float]:
+        """Propagate information through multi-scale neighbor network.
+
+        Uses layered neighbor structure for multi-scale information spread:
+        - Primary layer: Strong, local propagation
+        - Secondary layer: Weaker, broader propagation
+        - Tertiary layer: Rare global events
+
+        Based on murmuration research showing scale-free correlations
+        emerge from topological (not metric) coupling.
+
+        Args:
+            source_agent: Agent originating the information.
+            information: Data to propagate.
+            use_layers: Which layers to use (default: all).
+            perturbation_magnitude: Strength of the perturbation (for tracking).
+            max_hops: Maximum hops for primary layer.
+            decay_factor: Decay per hop for primary layer.
+
+        Returns:
+            Dict mapping agent_id -> information strength received.
+        """
+        if use_layers is None:
+            use_layers = [NeighborLayer.PRIMARY, NeighborLayer.SECONDARY]
+
+        reached: dict[str, float] = {source_agent: 1.0}
+
+        # Primary layer propagation (standard BFS with decay)
+        if NeighborLayer.PRIMARY in use_layers:
+            frontier = [(source_agent, 1.0, 0)]  # (agent, strength, hop)
+
+            while frontier:
+                current, strength, hop = frontier.pop(0)
+
+                if hop >= max_hops:
+                    continue
+
+                next_strength = strength * decay_factor
+                if next_strength < 0.01:
+                    continue
+
+                neighbors = self.get_neighbors(current, NeighborLayer.PRIMARY)
+                for neighbor in neighbors:
+                    if neighbor not in reached or reached[neighbor] < next_strength:
+                        reached[neighbor] = next_strength
+                        frontier.append((neighbor, next_strength, hop + 1))
+
+        # Secondary layer propagation (direct, weaker)
+        if NeighborLayer.SECONDARY in use_layers:
+            secondary_strength = self._layer_config.secondary_weight
+            secondary_neighbors = self.get_neighbors(source_agent, NeighborLayer.SECONDARY)
+
+            for neighbor in secondary_neighbors:
+                if neighbor not in reached:
+                    reached[neighbor] = secondary_strength
+                else:
+                    # Combine strengths (don't exceed 1.0)
+                    reached[neighbor] = min(1.0, reached[neighbor] + secondary_strength * 0.5)
+
+        # Tertiary layer propagation (rare, global)
+        if NeighborLayer.TERTIARY in use_layers:
+            tertiary_neighbors = self.get_neighbors(source_agent, NeighborLayer.TERTIARY)
+            tertiary_strength = self._layer_config.tertiary_probability
+
+            for neighbor in tertiary_neighbors:
+                if neighbor not in reached:
+                    reached[neighbor] = tertiary_strength
+                else:
+                    reached[neighbor] = min(1.0, reached[neighbor] + tertiary_strength * 0.3)
+
+        logger.debug(
+            f"Layered propagation from {source_agent}: "
+            f"reached {len(reached)} agents using layers {[l.value for l in use_layers]}"
         )
 
         return reached

@@ -494,6 +494,116 @@ if PROMETHEUS_AVAILABLE:
     )
 
     # ========================================================================
+    # Criticality Metrics (Phase 16)
+    # ========================================================================
+
+    CRITICALITY_STATE = Gauge(
+        "titan_criticality_state",
+        "Current criticality state (0=SUBCRITICAL, 1=CRITICAL, 2=SUPERCRITICAL)",
+        registry=REGISTRY,
+    )
+
+    CORRELATION_LENGTH = Gauge(
+        "titan_criticality_correlation_length",
+        "How far influence propagates through the system",
+        registry=REGISTRY,
+    )
+
+    SUSCEPTIBILITY = Gauge(
+        "titan_criticality_susceptibility",
+        "System response to perturbations",
+        registry=REGISTRY,
+    )
+
+    RELAXATION_TIME = Gauge(
+        "titan_criticality_relaxation_time",
+        "Time to return to equilibrium",
+        registry=REGISTRY,
+    )
+
+    FLUCTUATION_SIZE = Gauge(
+        "titan_criticality_fluctuation_size",
+        "Variance in system state",
+        registry=REGISTRY,
+    )
+
+    PHASE_TRANSITIONS = Counter(
+        "titan_phase_transitions_total",
+        "Total phase transitions detected",
+        ["from_state", "to_state"],
+        registry=REGISTRY,
+    )
+
+    # ========================================================================
+    # Fission-Fusion Metrics (Phase 16)
+    # ========================================================================
+
+    FISSION_FUSION_STATE = Gauge(
+        "titan_fission_fusion_state",
+        "Current fission-fusion state (0=FISSION, 1=FUSION, 2=TRANSITIONING)",
+        registry=REGISTRY,
+    )
+
+    CLUSTER_COUNT = Gauge(
+        "titan_cluster_count",
+        "Number of active clusters",
+        registry=REGISTRY,
+    )
+
+    FISSION_EVENTS = Counter(
+        "titan_fission_events_total",
+        "Total fission events",
+        registry=REGISTRY,
+    )
+
+    FUSION_EVENTS = Counter(
+        "titan_fusion_events_total",
+        "Total fusion events",
+        registry=REGISTRY,
+    )
+
+    # ========================================================================
+    # Information Center Metrics (Phase 16)
+    # ========================================================================
+
+    INFO_CENTERS_ACTIVE = Gauge(
+        "titan_info_centers_active",
+        "Number of active information centers",
+        ["role"],
+        registry=REGISTRY,
+    )
+
+    PATTERNS_STORED = Counter(
+        "titan_patterns_stored_total",
+        "Total patterns stored in information centers",
+        ["center_role"],
+        registry=REGISTRY,
+    )
+
+    PATTERNS_BROADCAST = Counter(
+        "titan_patterns_broadcast_total",
+        "Total patterns broadcast from information centers",
+        registry=REGISTRY,
+    )
+
+    GENERATIONS_ARCHIVED = Counter(
+        "titan_generations_archived_total",
+        "Total generations archived",
+        registry=REGISTRY,
+    )
+
+    # ========================================================================
+    # War Machine Metrics (Phase 16)
+    # ========================================================================
+
+    WAR_MACHINE_OPERATIONS = Counter(
+        "titan_war_machine_operations_total",
+        "Total war machine operations performed",
+        ["operation_type"],
+        registry=REGISTRY,
+    )
+
+    # ========================================================================
     # System Info
     # ========================================================================
 
@@ -935,6 +1045,107 @@ class MetricsCollector:
         }
         value = state_map.get(state.upper(), 0)
         ASSEMBLY_STATE.set(value)
+
+    # ========================================================================
+    # Criticality Metrics (Phase 16)
+    # ========================================================================
+
+    def set_criticality_state(self, state: str) -> None:
+        """Set criticality state (SUBCRITICAL=0, CRITICAL=1, SUPERCRITICAL=2)."""
+        if not self._enabled:
+            return
+        state_map = {"SUBCRITICAL": 0, "CRITICAL": 1, "SUPERCRITICAL": 2}
+        value = state_map.get(state.upper(), 0)
+        CRITICALITY_STATE.set(value)
+
+    def set_criticality_metrics(
+        self,
+        correlation_length: float,
+        susceptibility: float,
+        relaxation_time: float,
+        fluctuation_size: float,
+    ) -> None:
+        """Set criticality metrics."""
+        if not self._enabled:
+            return
+        CORRELATION_LENGTH.set(correlation_length)
+        SUSCEPTIBILITY.set(susceptibility)
+        RELAXATION_TIME.set(relaxation_time)
+        FLUCTUATION_SIZE.set(fluctuation_size)
+
+    def phase_transition(self, from_state: str, to_state: str) -> None:
+        """Record a phase transition."""
+        if not self._enabled:
+            return
+        PHASE_TRANSITIONS.labels(from_state=from_state, to_state=to_state).inc()
+
+    # ========================================================================
+    # Fission-Fusion Metrics (Phase 16)
+    # ========================================================================
+
+    def set_fission_fusion_state(self, state: str) -> None:
+        """Set fission-fusion state (FISSION=0, FUSION=1, TRANSITIONING=2)."""
+        if not self._enabled:
+            return
+        state_map = {"FISSION": 0, "FUSION": 1, "TRANSITIONING": 2}
+        value = state_map.get(state.upper(), 0)
+        FISSION_FUSION_STATE.set(value)
+
+    def set_cluster_count(self, count: int) -> None:
+        """Set the number of active clusters."""
+        if not self._enabled:
+            return
+        CLUSTER_COUNT.set(count)
+
+    def fission_event(self) -> None:
+        """Record a fission event."""
+        if not self._enabled:
+            return
+        FISSION_EVENTS.inc()
+
+    def fusion_event(self) -> None:
+        """Record a fusion event."""
+        if not self._enabled:
+            return
+        FUSION_EVENTS.inc()
+
+    # ========================================================================
+    # Information Center Metrics (Phase 16)
+    # ========================================================================
+
+    def set_info_centers_active(self, role: str, count: int) -> None:
+        """Set the number of active information centers by role."""
+        if not self._enabled:
+            return
+        INFO_CENTERS_ACTIVE.labels(role=role).set(count)
+
+    def pattern_stored(self, center_role: str) -> None:
+        """Record a pattern stored in an information center."""
+        if not self._enabled:
+            return
+        PATTERNS_STORED.labels(center_role=center_role).inc()
+
+    def pattern_broadcast(self) -> None:
+        """Record a pattern broadcast."""
+        if not self._enabled:
+            return
+        PATTERNS_BROADCAST.inc()
+
+    def generation_archived(self) -> None:
+        """Record a generation archived."""
+        if not self._enabled:
+            return
+        GENERATIONS_ARCHIVED.inc()
+
+    # ========================================================================
+    # War Machine Metrics (Phase 16)
+    # ========================================================================
+
+    def war_machine_operation(self, operation_type: str) -> None:
+        """Record a war machine operation."""
+        if not self._enabled:
+            return
+        WAR_MACHINE_OPERATIONS.labels(operation_type=operation_type).inc()
 
     # ========================================================================
     # System Info
