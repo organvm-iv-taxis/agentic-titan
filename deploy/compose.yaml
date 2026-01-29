@@ -56,6 +56,24 @@ services:
       retries: 5
     restart: unless-stopped
 
+  postgres:
+    image: postgres:16-alpine
+    container_name: titan-postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=titan
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-titan-dev}
+      - POSTGRES_DB=titan
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U titan -d titan"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   nats:
     image: nats:2-alpine
     container_name: titan-nats
@@ -193,8 +211,15 @@ services:
       - TITAN_CHROMADB_URL=http://chromadb:8000
       - TITAN_LOG_LEVEL=INFO
       - CELERY_BROKER_URL=redis://redis:6379/1
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=titan
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-titan-dev}
+      - POSTGRES_DB=titan
     depends_on:
       redis:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     restart: unless-stopped
     profiles:
@@ -262,8 +287,15 @@ services:
       - AWS_SECRET_ACCESS_KEY=titan-secret
       - TITAN_REDIS_URL=redis://redis:6379
       - TITAN_LOG_LEVEL=INFO
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=titan
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-titan-dev}
+      - POSTGRES_DB=titan
     depends_on:
       redis:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     deploy:
       replicas: 2
@@ -321,6 +353,7 @@ volumes:
   grafana-data:
   ollama-data:
   minio-data:
+  postgres-data:
 
 networks:
   default:

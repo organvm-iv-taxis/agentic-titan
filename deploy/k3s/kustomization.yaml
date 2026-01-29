@@ -7,10 +7,15 @@ resources:
   - namespace.yaml
   - configmap.yaml
   - secrets.yaml
+  - rbac.yaml
+  - network-policies.yaml
+  - resource-quotas.yaml
   - redis.yaml
   - chromadb.yaml
+  - postgres.yaml
   - api-deployment.yaml
   - agent-deployment.yaml
+  - celery-worker.yaml
   - hpa.yaml
   - ingress.yaml
 

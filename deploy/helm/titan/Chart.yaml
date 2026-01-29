@@ -30,3 +30,7 @@ dependencies:
     repository: https://example.com/charts
     condition: chromadb.enabled
     # Note: ChromaDB doesn't have official Helm chart, using local templates
+  - name: postgresql
+    version: "14.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled

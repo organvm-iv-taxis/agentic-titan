@@ -1,0 +1,180 @@
+# Titan RBAC - Role-Based Access Control
+#
+# Defines ServiceAccounts, Roles, and RoleBindings for the Titan platform.
+# Follows principle of least privilege.
+#
+# Components:
+# - titan-api: API service account with read access to configmaps
+# - titan-worker: Celery worker account with task-specific permissions
+
+---
+# ============================================================================
+# ServiceAccounts
+# ============================================================================
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: titan-api
+  namespace: titan
+  labels:
+    app.kubernetes.io/name: titan
+    app.kubernetes.io/component: api
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: titan-worker
+  namespace: titan
+  labels:
+    app.kubernetes.io/name: titan
+    app.kubernetes.io/component: worker
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: titan-scheduler
+  namespace: titan
+  labels:
+    app.kubernetes.io/name: titan
+    app.kubernetes.io/component: scheduler
+
+---
+# ============================================================================
+# Roles
+# ============================================================================
+
+# Role for API pods - read configmaps, limited secret access
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: titan-api-role
+  namespace: titan
+  labels:
+    app.kubernetes.io/name: titan
+    app.kubernetes.io/component: api
+rules:
+  # Read configmaps for configuration
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+  # Read specific secrets (credentials)
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames:
+      - titan-secrets
+      - postgres-credentials
+    verbs: ["get"]
+  # Read own pods for health checks
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+---
+# Role for Worker pods - task execution permissions
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: titan-worker-role
+  namespace: titan
+  labels:
+    app.kubernetes.io/name: titan
+    app.kubernetes.io/component: worker
+rules:
+  # Read configmaps for celery configuration
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames:
+      - titan-config
+      - titan-celery-config
+    verbs: ["get", "list", "watch"]
+  # Read specific secrets
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames:
+      - titan-secrets
+      - titan-celery-secrets
+      - postgres-credentials
+    verbs: ["get"]
+  # Workers may need to read pod info for coordination
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+---
+# Role for scheduler (celery-beat) - similar to worker
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: titan-scheduler-role
+  namespace: titan
+  labels:
+    app.kubernetes.io/name: titan
+    app.kubernetes.io/component: scheduler
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames:
+      - titan-config
+      - titan-celery-config
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames:
+      - titan-secrets
+      - titan-celery-secrets
+    verbs: ["get"]
+
+---
+# ============================================================================
+# RoleBindings
+# ============================================================================
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: titan-api-binding
+  namespace: titan
+  labels:
+    app.kubernetes.io/name: titan
+    app.kubernetes.io/component: api
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: titan-api-role
+subjects:
+  - kind: ServiceAccount
+    name: titan-api
+    namespace: titan
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: titan-worker-binding
+  namespace: titan
+  labels:
+    app.kubernetes.io/name: titan
+    app.kubernetes.io/component: worker
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: titan-worker-role
+subjects:
+  - kind: ServiceAccount
+    name: titan-worker
+    namespace: titan
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: titan-scheduler-binding
+  namespace: titan
+  labels:
+    app.kubernetes.io/name: titan
+    app.kubernetes.io/component: scheduler
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: titan-scheduler-role
+subjects:
+  - kind: ServiceAccount
+    name: titan-scheduler
+    namespace: titan

@@ -5,6 +5,8 @@ Provides REST and WebSocket APIs for the Titan platform including:
 - Inquiry workflow management
 - Agent orchestration
 - Memory system access
+- Authentication and authorization
+- Rate limiting
 """
 
 from __future__ import annotations
@@ -47,6 +49,15 @@ async def health_check() -> dict[str, Any]:
     }
 
 
+@app.get("/ready")
+async def readiness_check() -> dict[str, Any]:
+    """Readiness check endpoint for Kubernetes."""
+    return {
+        "status": "ready",
+        "service": "titan-api",
+    }
+
+
 # Import and include routers
 def register_routers() -> None:
     """Register all API routers."""
@@ -54,12 +65,28 @@ def register_routers() -> None:
     from titan.api.inquiry_ws import ws_router
     from titan.api.batch_routes import batch_router
     from titan.api.batch_ws import batch_ws_router
+    from titan.api.auth_routes import auth_router
+    from titan.api.admin_routes import admin_router
 
+    # Register routers
+    api_router.include_router(auth_router)
     api_router.include_router(inquiry_router)
     api_router.include_router(batch_router)
+    api_router.include_router(admin_router)
     app.include_router(api_router)
     app.include_router(ws_router)  # WebSocket routes at root level
     app.include_router(batch_ws_router)  # Batch WebSocket/SSE routes
+
+
+def setup_rate_limiting() -> None:
+    """Set up rate limiting middleware."""
+    try:
+        from titan.api.rate_limit import setup_rate_limiting as _setup
+        _setup(app)
+    except ImportError:
+        logger.warning("Rate limiting not available (slowapi not installed)")
+    except Exception as e:
+        logger.warning(f"Rate limiting setup failed: {e}")
 
 
 # Lazy registration to avoid circular imports
@@ -72,6 +99,7 @@ async def startup_event() -> None:
     global _routers_registered
     if not _routers_registered:
         register_routers()
+        setup_rate_limiting()
         _routers_registered = True
     logger.info("Titan API started")
 

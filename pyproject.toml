@@ -90,8 +90,18 @@ ray = [
 celery = [
     "celery[redis]>=5.3.0",
 ]
+# Phase 15: Authentication
+auth = [
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.0",
+    "python-multipart>=0.0.9",
+]
+# Phase 15: Rate limiting
+ratelimit = [
+    "slowapi>=0.1.9",
+]
 all = [
-    "agentic-titan[local-llm,vector-db,messaging,embeddings,dashboard,metrics,stress,documents,langfuse,lsp,memori,postgres,evaluation,ray,celery]",
+    "agentic-titan[local-llm,vector-db,messaging,embeddings,dashboard,metrics,stress,documents,langfuse,lsp,memori,postgres,evaluation,ray,celery,auth,ratelimit]",
 ]
 
 [project.scripts]

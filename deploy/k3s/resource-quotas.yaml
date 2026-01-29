@@ -1,0 +1,205 @@
+# Titan Resource Quotas and Limit Ranges
+#
+# Defines resource constraints for the Titan namespace to prevent
+# resource exhaustion and ensure fair scheduling.
+
+---
+# ============================================================================
+# Resource Quota - Namespace Level Limits
+# ============================================================================
+
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: titan-resource-quota
+  namespace: titan
+  labels:
+    app.kubernetes.io/name: titan
+    app.kubernetes.io/component: resource-management
+spec:
+  hard:
+    # CPU limits
+    requests.cpu: "10"
+    limits.cpu: "20"
+
+    # Memory limits
+    requests.memory: 20Gi
+    limits.memory: 40Gi
+
+    # Pod count limits
+    pods: "50"
+    count/deployments.apps: "20"
+    count/statefulsets.apps: "5"
+
+    # Storage limits
+    requests.storage: 100Gi
+    persistentvolumeclaims: "10"
+
+    # Service limits
+    services: "20"
+    services.loadbalancers: "2"
+    services.nodeports: "5"
+
+    # Secrets and ConfigMaps
+    secrets: "50"
+    configmaps: "50"
+
+---
+# ============================================================================
+# Limit Range - Pod Level Defaults and Constraints
+# ============================================================================
+
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: titan-limit-range
+  namespace: titan
+  labels:
+    app.kubernetes.io/name: titan
+    app.kubernetes.io/component: resource-management
+spec:
+  limits:
+    # Default limits for containers
+    - type: Container
+      default:
+        cpu: 500m
+        memory: 512Mi
+      defaultRequest:
+        cpu: 100m
+        memory: 128Mi
+      max:
+        cpu: "4"
+        memory: 8Gi
+      min:
+        cpu: 50m
+        memory: 64Mi
+
+    # Limits for pods
+    - type: Pod
+      max:
+        cpu: "8"
+        memory: 16Gi
+      min:
+        cpu: 50m
+        memory: 64Mi
+
+    # Limits for PVCs
+    - type: PersistentVolumeClaim
+      max:
+        storage: 50Gi
+      min:
+        storage: 1Gi
+
+---
+# ============================================================================
+# Priority Classes for Workload Scheduling
+# ============================================================================
+
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: titan-critical
+  labels:
+    app.kubernetes.io/name: titan
+    app.kubernetes.io/component: scheduling
+value: 1000000
+globalDefault: false
+description: "Critical Titan services (API, PostgreSQL, Redis)"
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: titan-high
+  labels:
+    app.kubernetes.io/name: titan
+    app.kubernetes.io/component: scheduling
+value: 100000
+globalDefault: false
+description: "High priority Titan services (Workers, Celery Beat)"
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: titan-normal
+  labels:
+    app.kubernetes.io/name: titan
+    app.kubernetes.io/component: scheduling
+value: 10000
+globalDefault: false
+description: "Normal priority Titan services (Agents, Monitoring)"
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: titan-low
+  labels:
+    app.kubernetes.io/name: titan
+    app.kubernetes.io/component: scheduling
+value: 1000
+globalDefault: false
+description: "Low priority Titan services (Background tasks, Cleanup)"
+
+---
+# ============================================================================
+# Pod Disruption Budgets
+# ============================================================================
+
+# Ensure API always has at least 1 replica available
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: titan-api-pdb
+  namespace: titan
+  labels:
+    app.kubernetes.io/name: titan
+    app.kubernetes.io/component: api
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: api
+---
+# Ensure workers have at least 50% available during disruptions
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: titan-worker-pdb
+  namespace: titan
+  labels:
+    app.kubernetes.io/name: titan
+    app.kubernetes.io/component: worker
+spec:
+  minAvailable: "50%"
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: worker
+---
+# Redis should never be disrupted (StatefulSet protection)
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: titan-redis-pdb
+  namespace: titan
+  labels:
+    app.kubernetes.io/name: titan
+    app.kubernetes.io/component: redis
+spec:
+  maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: redis
+---
+# PostgreSQL should never be disrupted
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: titan-postgres-pdb
+  namespace: titan
+  labels:
+    app.kubernetes.io/name: titan
+    app.kubernetes.io/component: postgres
+spec:
+  maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgres

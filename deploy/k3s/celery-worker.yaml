@@ -78,11 +78,17 @@ spec:
                 name: titan-celery-config
             - secretRef:
                 name: titan-celery-secrets
+            - secretRef:
+                name: postgres-credentials
           env:
             - name: CELERY_WORKER_ID
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
+            - name: POSTGRES_HOST
+              value: postgres
+            - name: POSTGRES_PORT
+              value: "5432"
           resources:
             requests:
               memory: "512Mi"

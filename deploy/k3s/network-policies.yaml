@@ -1,0 +1,302 @@
+# Titan Network Policies
+#
+# Defines network isolation rules for the Titan namespace.
+# Implements defense in depth with explicit allow rules.
+#
+# Default: Deny all ingress, allow specific communications
+
+---
+# ============================================================================
+# Default Deny Policy
+# ============================================================================
+
+# Deny all ingress by default
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: titan
+  labels:
+    app.kubernetes.io/name: titan
+    app.kubernetes.io/component: network-policy
+spec:
+  podSelector: {}  # Applies to all pods in namespace
+  policyTypes:
+    - Ingress
+
+---
+# ============================================================================
+# API Service Policies
+# ============================================================================
+
+# Allow ingress to API from ingress controller
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-api-ingress
+  namespace: titan
+  labels:
+    app.kubernetes.io/name: titan
+    app.kubernetes.io/component: network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: api
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow from ingress controller namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: traefik
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+      ports:
+        - protocol: TCP
+          port: 8000
+        - protocol: TCP
+          port: 8080
+    # Allow Prometheus scraping
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 9100
+
+---
+# ============================================================================
+# Redis Access Policies
+# ============================================================================
+
+# Allow API and Workers to access Redis
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-redis-access
+  namespace: titan
+  labels:
+    app.kubernetes.io/name: titan
+    app.kubernetes.io/component: network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: redis
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        # From API pods
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: api
+        # From worker pods
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: worker
+        # From celery-beat pods
+        - podSelector:
+            matchLabels:
+              app: titan-celery-beat
+        # From flower pods
+        - podSelector:
+            matchLabels:
+              app: titan-flower
+      ports:
+        - protocol: TCP
+          port: 6379
+
+---
+# ============================================================================
+# PostgreSQL Access Policies
+# ============================================================================
+
+# Allow API and Workers to access PostgreSQL
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-postgres-access
+  namespace: titan
+  labels:
+    app.kubernetes.io/name: titan
+    app.kubernetes.io/component: network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: postgres
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        # From API pods
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: api
+        # From worker pods
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: worker
+        # From celery-beat pods
+        - podSelector:
+            matchLabels:
+              app: titan-celery-beat
+      ports:
+        - protocol: TCP
+          port: 5432
+
+---
+# ============================================================================
+# ChromaDB Access Policies
+# ============================================================================
+
+# Allow API and Workers to access ChromaDB
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-chromadb-access
+  namespace: titan
+  labels:
+    app.kubernetes.io/name: titan
+    app.kubernetes.io/component: network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: chromadb
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        # From API pods
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: api
+        # From worker pods
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: worker
+        # From agent pods
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: agent
+      ports:
+        - protocol: TCP
+          port: 8000
+
+---
+# ============================================================================
+# Prometheus Scraping Policy
+# ============================================================================
+
+# Allow Prometheus to scrape metrics from all pods
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-scrape
+  namespace: titan
+  labels:
+    app.kubernetes.io/name: titan
+    app.kubernetes.io/component: network-policy
+spec:
+  podSelector:
+    matchLabels:
+      prometheus.io/scrape: "true"
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 9100
+        - protocol: TCP
+          port: 9121  # Redis exporter
+
+---
+# ============================================================================
+# Worker Inter-Pod Communication
+# ============================================================================
+
+# Allow workers to communicate with each other (for HiveMind coordination)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-worker-coordination
+  namespace: titan
+  labels:
+    app.kubernetes.io/name: titan
+    app.kubernetes.io/component: network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: worker
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: worker
+      ports:
+        - protocol: TCP
+          port: 9100  # Metrics/coordination
+
+---
+# ============================================================================
+# Egress Policy - DNS and External APIs
+# ============================================================================
+
+# Allow egress for DNS and external API access
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-external
+  namespace: titan
+  labels:
+    app.kubernetes.io/name: titan
+    app.kubernetes.io/component: network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: agentic-titan
+  policyTypes:
+    - Egress
+  egress:
+    # Allow DNS
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Allow HTTPS (for LLM APIs)
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+    # Allow internal cluster communication
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: titan
