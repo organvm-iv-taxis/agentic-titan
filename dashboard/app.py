@@ -194,6 +194,17 @@ class TitanDashboard:
                 },
             )
 
+        @self.app.get("/models", response_class=HTMLResponse)
+        async def models_page(request: Request) -> HTMLResponse:
+            """Model cognitive signatures page."""
+            return templates.TemplateResponse(
+                "models.html",
+                {
+                    "request": request,
+                    "title": "Model Signatures",
+                },
+            )
+
         # ====================================================================
         # API Routes
         # ====================================================================

@@ -36,6 +36,10 @@ from titan.workflows.cognitive_router import (
     CognitiveTaskType,
     get_cognitive_router,
 )
+from titan.workflows.inquiry_dag import (
+    InquiryDependencyGraph,
+    ExecutionMode,
+)
 
 if TYPE_CHECKING:
     from hive.memory import HiveMind
@@ -537,6 +541,206 @@ class InquiryEngine:
             )
 
         return session
+
+    async def run_dag_workflow(
+        self,
+        session: InquirySession,
+        execution_mode: ExecutionMode = ExecutionMode.STAGED,
+    ) -> InquirySession:
+        """
+        Run workflow stages using DAG-based execution ordering.
+
+        This method respects stage dependencies and can execute independent
+        stages in parallel when execution_mode is STAGED or PARALLEL.
+
+        Args:
+            session: The inquiry session to run
+            execution_mode: How to execute stages:
+                - SEQUENTIAL: One stage at a time, respecting dependency order
+                - PARALLEL: All ready stages at once
+                - STAGED: Level by level (default, recommended)
+
+        Returns:
+            The completed session
+        """
+        logger.info(
+            f"Running DAG workflow for session {session.id} "
+            f"(mode: {execution_mode.value})"
+        )
+
+        # Build dependency graph from workflow
+        graph = InquiryDependencyGraph.from_workflow(session.workflow)
+
+        # Store graph info in session metadata
+        session.metadata["dag_info"] = {
+            "execution_mode": execution_mode.value,
+            "levels": graph.topological_sort(),
+            "can_parallelize": graph.can_parallelize(),
+        }
+
+        try:
+            if execution_mode == ExecutionMode.SEQUENTIAL:
+                await self._run_dag_sequential(session, graph)
+            elif execution_mode == ExecutionMode.PARALLEL:
+                await self._run_dag_parallel(session, graph)
+            else:  # STAGED
+                await self._run_dag_staged(session, graph)
+
+            # Mark complete
+            if session.status == InquiryStatus.RUNNING:
+                session.status = InquiryStatus.COMPLETED
+                session.completed_at = datetime.now()
+
+                # Notify handlers
+                for handler in self._on_session_completed:
+                    try:
+                        handler(session)
+                    except Exception as e:
+                        logger.warning(f"Session completed handler error: {e}")
+
+            logger.info(
+                f"DAG workflow complete for session {session.id}. "
+                f"Ran {len(session.results)} stages."
+            )
+
+        except Exception as e:
+            logger.error(f"DAG workflow failed for session {session.id}: {e}")
+            session.status = InquiryStatus.FAILED
+            session.error = str(e)
+            session.completed_at = datetime.now()
+
+        # Update Hive Mind
+        if self._hive_mind:
+            await self._hive_mind.set(
+                f"inquiry:{session.id}",
+                session.to_dict(),
+                ttl=3600 * 24 * 7,
+            )
+
+        return session
+
+    async def _run_dag_sequential(
+        self,
+        session: InquirySession,
+        graph: InquiryDependencyGraph,
+    ) -> None:
+        """Execute DAG stages one at a time in dependency order."""
+        completed: set[int] = set()
+
+        while len(completed) < len(graph):
+            if session.status == InquiryStatus.CANCELLED:
+                break
+
+            ready = graph.get_ready_stages(completed)
+            if not ready:
+                logger.warning("No ready stages - possible cycle or completion")
+                break
+
+            # Execute first ready stage
+            stage_idx = ready[0]
+            await self.run_stage(session, stage_idx)
+            graph.mark_completed(stage_idx)
+            completed.add(stage_idx)
+
+    async def _run_dag_parallel(
+        self,
+        session: InquirySession,
+        graph: InquiryDependencyGraph,
+    ) -> None:
+        """Execute all ready stages in parallel."""
+        completed: set[int] = set()
+
+        while len(completed) < len(graph):
+            if session.status == InquiryStatus.CANCELLED:
+                break
+
+            ready = graph.get_ready_stages(completed)
+            if not ready:
+                break
+
+            logger.info(f"Executing {len(ready)} stages in parallel: {ready}")
+
+            # Execute all ready stages concurrently
+            tasks = [self.run_stage(session, idx) for idx in ready]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            # Mark completed and handle errors
+            for idx, result in zip(ready, results):
+                if isinstance(result, Exception):
+                    logger.error(f"Stage {idx} failed: {result}")
+                    graph.mark_failed(idx)
+                else:
+                    graph.mark_completed(idx)
+                completed.add(idx)
+
+    async def _run_dag_staged(
+        self,
+        session: InquirySession,
+        graph: InquiryDependencyGraph,
+    ) -> None:
+        """Execute stages level by level (respecting dependencies)."""
+        levels = graph.topological_sort()
+
+        for level_idx, level_stages in enumerate(levels):
+            if session.status == InquiryStatus.CANCELLED:
+                break
+
+            logger.info(
+                f"Executing DAG level {level_idx + 1}/{len(levels)}: "
+                f"stages {level_stages}"
+            )
+
+            if len(level_stages) == 1:
+                # Single stage - execute directly
+                await self.run_stage(session, level_stages[0])
+                graph.mark_completed(level_stages[0])
+            else:
+                # Multiple stages - execute in parallel
+                tasks = [self.run_stage(session, idx) for idx in level_stages]
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+
+                for idx, result in zip(level_stages, results):
+                    if isinstance(result, Exception):
+                        logger.error(f"Stage {idx} failed: {result}")
+                        graph.mark_failed(idx)
+                    else:
+                        graph.mark_completed(idx)
+
+    def get_dag_context_for_stage(
+        self,
+        session: InquirySession,
+        stage_idx: int,
+    ) -> str:
+        """
+        Get context specifically from dependency stages (DAG-aware).
+
+        Unlike sequential context which includes all previous stages,
+        DAG context only includes results from stages this one depends on.
+
+        Args:
+            session: The inquiry session
+            stage_idx: Index of the stage needing context
+
+        Returns:
+            Context string from dependency stages
+        """
+        graph = InquiryDependencyGraph.from_workflow(session.workflow)
+        context_stage_indices = graph.get_context_stages(stage_idx)
+
+        if not context_stage_indices:
+            return ""
+
+        # Build context from dependency stages only
+        context = {}
+        for result in session.results:
+            if result.stage_index in context_stage_indices:
+                context[result.stage_name] = {
+                    "role": result.role,
+                    "content": result.content,
+                    "stage_index": result.stage_index,
+                }
+
+        return json.dumps(context, indent=2) if context else ""
 
     async def stream_workflow(
         self,

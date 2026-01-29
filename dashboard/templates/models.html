@@ -1,0 +1,420 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Model Cognitive Signatures</h1>
+
+<div class="grid">
+    <article>
+        <header>
+            <h3>Epistemic Radar Chart</h3>
+            <p>Model capabilities across cognitive dimensions (0-10 scale)</p>
+        </header>
+        <div id="model-selector" style="margin-bottom: 1rem;">
+            <fieldset>
+                <legend>Select Models to Compare</legend>
+                <div id="model-checkboxes" style="display: flex; flex-wrap: wrap; gap: 1rem;">
+                    <!-- Dynamically populated -->
+                </div>
+            </fieldset>
+        </div>
+        <div class="topology-viz" style="min-height: 400px;">
+            <canvas id="radarChart"></canvas>
+        </div>
+    </article>
+
+    <article>
+        <header>
+            <h3>Model Rankings</h3>
+        </header>
+        <div id="model-rankings">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Model</th>
+                        <th>Top Strengths</th>
+                        <th>Avg Score</th>
+                    </tr>
+                </thead>
+                <tbody id="rankings-body">
+                    <!-- Dynamically populated -->
+                </tbody>
+            </table>
+        </div>
+    </article>
+</div>
+
+<div class="grid">
+    <article>
+        <header>
+            <h3>Task Preferences</h3>
+            <p>Recommended model for each cognitive task type</p>
+        </header>
+        <div id="task-preferences">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Task Type</th>
+                        <th>Preferred Model</th>
+                        <th>Alternatives</th>
+                    </tr>
+                </thead>
+                <tbody id="preferences-body">
+                    <!-- Dynamically populated -->
+                </tbody>
+            </table>
+        </div>
+    </article>
+
+    <article>
+        <header>
+            <h3>Model Comparison</h3>
+        </header>
+        <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+            <select id="compare-model-a">
+                <option value="">Select Model A</option>
+            </select>
+            <select id="compare-model-b">
+                <option value="">Select Model B</option>
+            </select>
+            <button id="compare-btn" class="outline">Compare</button>
+        </div>
+        <div id="comparison-result" style="display: none;">
+            <div id="comparison-summary" style="margin-bottom: 1rem;"></div>
+            <div id="comparison-details"></div>
+        </div>
+    </article>
+</div>
+
+<style>
+    .model-color-0 { background: rgba(0, 212, 170, 0.8); }
+    .model-color-1 { background: rgba(99, 110, 114, 0.8); }
+    .model-color-2 { background: rgba(253, 203, 110, 0.8); }
+    .model-color-3 { background: rgba(214, 48, 49, 0.8); }
+    .model-color-4 { background: rgba(116, 185, 255, 0.8); }
+
+    .winner { color: var(--success); font-weight: bold; }
+    .loser { color: var(--muted-color); }
+
+    .score-bar {
+        height: 20px;
+        border-radius: 4px;
+        transition: width 0.3s ease;
+    }
+
+    .comparison-bar {
+        display: flex;
+        gap: 4px;
+        align-items: center;
+    }
+
+    .comparison-bar-a {
+        background: var(--primary);
+        height: 16px;
+        border-radius: 2px;
+    }
+
+    .comparison-bar-b {
+        background: var(--secondary);
+        height: 16px;
+        border-radius: 2px;
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Chart.js radar chart configuration
+    let radarChart = null;
+    let signaturesData = null;
+    let selectedModels = new Set();
+
+    // Model colors for the chart
+    const modelColors = [
+        { bg: 'rgba(0, 212, 170, 0.2)', border: 'rgba(0, 212, 170, 1)' },
+        { bg: 'rgba(99, 110, 114, 0.2)', border: 'rgba(99, 110, 114, 1)' },
+        { bg: 'rgba(253, 203, 110, 0.2)', border: 'rgba(253, 203, 110, 1)' },
+        { bg: 'rgba(214, 48, 49, 0.2)', border: 'rgba(214, 48, 49, 1)' },
+        { bg: 'rgba(116, 185, 255, 0.2)', border: 'rgba(116, 185, 255, 1)' },
+    ];
+
+    // Fetch model signatures and render chart
+    async function loadSignatures() {
+        try {
+            const response = await fetch('/api/models/signatures');
+            signaturesData = await response.json();
+
+            // Create model checkboxes
+            const container = document.getElementById('model-checkboxes');
+            container.innerHTML = '';
+
+            const modelIds = Object.keys(signaturesData.models);
+            modelIds.forEach((modelId, idx) => {
+                const label = document.createElement('label');
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = `model-${idx}`;
+                checkbox.value = modelId;
+                checkbox.checked = idx < 3; // Select first 3 by default
+                if (checkbox.checked) selectedModels.add(modelId);
+
+                checkbox.addEventListener('change', (e) => {
+                    if (e.target.checked) {
+                        selectedModels.add(modelId);
+                    } else {
+                        selectedModels.delete(modelId);
+                    }
+                    updateChart();
+                });
+
+                label.appendChild(checkbox);
+                label.appendChild(document.createTextNode(' ' + formatModelName(modelId)));
+                container.appendChild(label);
+            });
+
+            // Initialize chart
+            initChart();
+            updateChart();
+
+            // Populate comparison selectors
+            populateCompareSelectors(modelIds);
+        } catch (err) {
+            console.error('Error loading signatures:', err);
+        }
+    }
+
+    function formatModelName(modelId) {
+        // Shorten model names for display
+        return modelId
+            .replace('claude-3-5-sonnet-20241022', 'Claude 3.5 Sonnet')
+            .replace('claude-3-opus-20240229', 'Claude 3 Opus')
+            .replace('gpt-4-turbo', 'GPT-4 Turbo')
+            .replace('gpt-4o', 'GPT-4o')
+            .replace('gemini-pro', 'Gemini Pro');
+    }
+
+    function formatDimension(dim) {
+        return dim.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    }
+
+    function initChart() {
+        const ctx = document.getElementById('radarChart').getContext('2d');
+
+        radarChart = new Chart(ctx, {
+            type: 'radar',
+            data: {
+                labels: signaturesData.dimensions.map(formatDimension),
+                datasets: []
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    r: {
+                        min: 0,
+                        max: 10,
+                        ticks: {
+                            stepSize: 2,
+                            color: 'rgba(255, 255, 255, 0.6)'
+                        },
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.2)'
+                        },
+                        angleLines: {
+                            color: 'rgba(255, 255, 255, 0.2)'
+                        },
+                        pointLabels: {
+                            color: 'rgba(255, 255, 255, 0.8)',
+                            font: {
+                                size: 11
+                            }
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            color: 'rgba(255, 255, 255, 0.8)'
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function updateChart() {
+        if (!radarChart || !signaturesData) return;
+
+        const datasets = [];
+        let colorIdx = 0;
+
+        selectedModels.forEach(modelId => {
+            const scores = signaturesData.models[modelId];
+            const color = modelColors[colorIdx % modelColors.length];
+
+            datasets.push({
+                label: formatModelName(modelId),
+                data: signaturesData.dimensions.map(dim => scores[dim] || 0),
+                backgroundColor: color.bg,
+                borderColor: color.border,
+                borderWidth: 2,
+                pointBackgroundColor: color.border,
+                pointBorderColor: '#fff',
+                pointRadius: 4,
+            });
+            colorIdx++;
+        });
+
+        radarChart.data.datasets = datasets;
+        radarChart.update();
+    }
+
+    // Load model rankings
+    async function loadRankings() {
+        try {
+            const response = await fetch('/api/models/list');
+            const data = await response.json();
+
+            const tbody = document.getElementById('rankings-body');
+            tbody.innerHTML = '';
+
+            data.models.forEach(model => {
+                const row = document.createElement('tr');
+
+                const nameCell = document.createElement('td');
+                nameCell.textContent = formatModelName(model.model_id);
+                row.appendChild(nameCell);
+
+                const strengthsCell = document.createElement('td');
+                strengthsCell.innerHTML = model.top_strengths
+                    .map(s => `<small>${formatDimension(s.task)}: ${s.score}</small>`)
+                    .join('<br>');
+                row.appendChild(strengthsCell);
+
+                const avgCell = document.createElement('td');
+                avgCell.textContent = model.average_score.toFixed(1);
+                row.appendChild(avgCell);
+
+                tbody.appendChild(row);
+            });
+        } catch (err) {
+            console.error('Error loading rankings:', err);
+        }
+    }
+
+    // Load task preferences
+    async function loadPreferences() {
+        try {
+            const response = await fetch('/api/models/preferences');
+            const data = await response.json();
+
+            const tbody = document.getElementById('preferences-body');
+            tbody.innerHTML = '';
+
+            Object.entries(data).forEach(([taskType, prefs]) => {
+                const row = document.createElement('tr');
+
+                const taskCell = document.createElement('td');
+                taskCell.textContent = formatDimension(taskType);
+                row.appendChild(taskCell);
+
+                const preferredCell = document.createElement('td');
+                preferredCell.innerHTML = `<strong>${formatModelName(prefs.preferred || 'None')}</strong>`;
+                row.appendChild(preferredCell);
+
+                const altsCell = document.createElement('td');
+                altsCell.textContent = prefs.alternatives
+                    .map(formatModelName)
+                    .join(', ') || '-';
+                row.appendChild(altsCell);
+
+                tbody.appendChild(row);
+            });
+        } catch (err) {
+            console.error('Error loading preferences:', err);
+        }
+    }
+
+    // Populate comparison selectors
+    function populateCompareSelectors(modelIds) {
+        const selectA = document.getElementById('compare-model-a');
+        const selectB = document.getElementById('compare-model-b');
+
+        modelIds.forEach(modelId => {
+            const optionA = document.createElement('option');
+            optionA.value = modelId;
+            optionA.textContent = formatModelName(modelId);
+            selectA.appendChild(optionA);
+
+            const optionB = document.createElement('option');
+            optionB.value = modelId;
+            optionB.textContent = formatModelName(modelId);
+            selectB.appendChild(optionB);
+        });
+    }
+
+    // Compare models
+    async function compareModels() {
+        const modelA = document.getElementById('compare-model-a').value;
+        const modelB = document.getElementById('compare-model-b').value;
+
+        if (!modelA || !modelB) {
+            alert('Please select two models to compare');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/models/compare?model_a=${encodeURIComponent(modelA)}&model_b=${encodeURIComponent(modelB)}`);
+            const data = await response.json();
+
+            const resultDiv = document.getElementById('comparison-result');
+            resultDiv.style.display = 'block';
+
+            // Summary
+            const summaryDiv = document.getElementById('comparison-summary');
+            const winner = data.summary.overall_winner;
+            summaryDiv.innerHTML = `
+                <strong>Result:</strong>
+                ${formatModelName(data.model_a)}: ${data.summary.model_a_wins} wins |
+                ${formatModelName(data.model_b)}: ${data.summary.model_b_wins} wins |
+                Ties: ${data.summary.ties}
+                <br>
+                <strong>Overall Winner:</strong> ${winner === 'tie' ? 'Tie' : formatModelName(winner)}
+            `;
+
+            // Details
+            const detailsDiv = document.getElementById('comparison-details');
+            detailsDiv.innerHTML = '<table><thead><tr><th>Dimension</th><th>Comparison</th></tr></thead><tbody>' +
+                data.dimensions.map(d => `
+                    <tr>
+                        <td>${formatDimension(d.dimension)}</td>
+                        <td>
+                            <div class="comparison-bar">
+                                <div class="comparison-bar-a" style="width: ${d.model_a_score * 10}px;"
+                                     title="${formatModelName(data.model_a)}: ${d.model_a_score}"></div>
+                                <span class="${d.winner === data.model_a ? 'winner' : ''}">${d.model_a_score}</span>
+                                <span>vs</span>
+                                <span class="${d.winner === data.model_b ? 'winner' : ''}">${d.model_b_score}</span>
+                                <div class="comparison-bar-b" style="width: ${d.model_b_score * 10}px;"
+                                     title="${formatModelName(data.model_b)}: ${d.model_b_score}"></div>
+                            </div>
+                        </td>
+                    </tr>
+                `).join('') +
+                '</tbody></table>';
+        } catch (err) {
+            console.error('Error comparing models:', err);
+        }
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+        loadSignatures();
+        loadRankings();
+        loadPreferences();
+
+        document.getElementById('compare-btn').addEventListener('click', compareModels);
+    });
+</script>
+{% endblock %}

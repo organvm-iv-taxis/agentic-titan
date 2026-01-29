@@ -56,6 +56,7 @@ class InquiryStage:
     emoji: str = ""
     color: str = "blue"
     metadata: dict[str, Any] = field(default_factory=dict)
+    dependencies: list[int] | None = None  # Stage indices this depends on (for DAG execution)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
@@ -69,6 +70,7 @@ class InquiryStage:
             "model_traits": self.model_traits,
             "emoji": self.emoji,
             "color": self.color,
+            "dependencies": self.dependencies,
         }
 
 

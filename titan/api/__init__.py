@@ -67,12 +67,14 @@ def register_routers() -> None:
     from titan.api.batch_ws import batch_ws_router
     from titan.api.auth_routes import auth_router
     from titan.api.admin_routes import admin_router
+    from titan.api.models_routes import models_router
 
     # Register routers
     api_router.include_router(auth_router)
     api_router.include_router(inquiry_router)
     api_router.include_router(batch_router)
     api_router.include_router(admin_router)
+    api_router.include_router(models_router)
     app.include_router(api_router)
     app.include_router(ws_router)  # WebSocket routes at root level
     app.include_router(batch_ws_router)  # Batch WebSocket/SSE routes
