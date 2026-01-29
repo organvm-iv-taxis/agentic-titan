@@ -31,6 +31,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, Callable
 
 from agents.framework.errors import AgentError, TitanError
+from titan.metrics import get_metrics
 
 if TYPE_CHECKING:
     from hive.memory import HiveMind
@@ -406,6 +407,11 @@ class BaseAgent(ABC):
         """
         start_time = datetime.now()
         self._session_id = uuid.uuid4().hex
+        metrics = get_metrics()
+        archetype = self._get_archetype_name()
+
+        # Record agent spawn
+        metrics.agent_spawned(archetype)
 
         self._context = AgentContext(
             agent_id=self.agent_id,
@@ -446,6 +452,15 @@ class BaseAgent(ABC):
             await self.shutdown()
 
             execution_time_ms = int((datetime.now() - start_time).total_seconds() * 1000)
+            execution_time_seconds = execution_time_ms / 1000
+
+            # Record agent completion metrics
+            metrics.agent_completed(
+                archetype=archetype,
+                status="completed",
+                duration_seconds=execution_time_seconds,
+                turns=self._context.turn_number,
+            )
 
             # Audit: Log agent completion
             await self._audit_agent_completed(result, execution_time_ms)
@@ -469,6 +484,16 @@ class BaseAgent(ABC):
             await self._safe_shutdown()
 
             execution_time_ms = int((datetime.now() - start_time).total_seconds() * 1000)
+            execution_time_seconds = execution_time_ms / 1000
+
+            # Record agent timeout metrics
+            metrics.agent_completed(
+                archetype=archetype,
+                status="timeout",
+                duration_seconds=execution_time_seconds,
+                turns=self._context.turn_number if self._context else 0,
+            )
+            metrics.agent_error(archetype, "timeout")
 
             # Audit: Log agent failure
             await self._audit_agent_failed(
@@ -492,6 +517,16 @@ class BaseAgent(ABC):
             await self._safe_shutdown()
 
             execution_time_ms = int((datetime.now() - start_time).total_seconds() * 1000)
+            execution_time_seconds = execution_time_ms / 1000
+
+            # Record agent failure metrics
+            metrics.agent_completed(
+                archetype=archetype,
+                status="failed",
+                duration_seconds=execution_time_seconds,
+                turns=self._context.turn_number if self._context else 0,
+            )
+            metrics.agent_error(archetype, type(e).__name__)
 
             # Audit: Log agent failure
             await self._audit_agent_failed(str(e), execution_time_ms)
@@ -737,6 +772,17 @@ class BaseAgent(ABC):
             self._context.turn_number += 1
             return self._context.turn_number
         return 0
+
+    def _get_archetype_name(self) -> str:
+        """Get the archetype name for metrics.
+
+        Returns the class name without 'Agent' suffix in lowercase,
+        or falls back to the agent name.
+        """
+        class_name = self.__class__.__name__
+        if class_name.endswith("Agent"):
+            return class_name[:-5].lower()
+        return self.name.lower()
 
     # =========================================================================
     # Stopping Conditions & Checkpoints

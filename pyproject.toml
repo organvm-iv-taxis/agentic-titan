@@ -82,8 +82,16 @@ postgres = [
 evaluation = [
     "deepeval>=0.21.0",
 ]
+# Phase 14: Ray Serve compute backend
+ray = [
+    "ray[serve]>=2.9.0",
+]
+# Phase 13: Celery batch processing
+celery = [
+    "celery[redis]>=5.3.0",
+]
 all = [
-    "agentic-titan[local-llm,vector-db,messaging,embeddings,dashboard,metrics,stress,documents,langfuse,lsp,memori,postgres,evaluation]",
+    "agentic-titan[local-llm,vector-db,messaging,embeddings,dashboard,metrics,stress,documents,langfuse,lsp,memori,postgres,evaluation,ray,celery]",
 ]
 
 [project.scripts]

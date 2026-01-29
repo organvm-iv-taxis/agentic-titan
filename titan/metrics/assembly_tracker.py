@@ -24,6 +24,16 @@ if TYPE_CHECKING:
 logger = logging.getLogger("titan.metrics.assembly_tracker")
 
 
+def _get_prometheus_metrics():
+    """Lazy import to avoid circular dependency.
+
+    Uses the parent package's get_metrics which handles the
+    shadowing of titan/metrics.py by the titan/metrics/ package.
+    """
+    from titan.metrics import get_metrics
+    return get_metrics()
+
+
 class AssemblyTracker:
     """Tracks assembly paths through agent coordination.
 
@@ -97,6 +107,35 @@ class AssemblyTracker:
         logger.debug(f"Started assembly path: {path_id}")
         return path
 
+    def _record_prometheus_metrics(self, path: AssemblyPath) -> None:
+        """Record assembly path metrics to Prometheus."""
+        metrics = _get_prometheus_metrics()
+
+        # Record path completion
+        path_type = path.metadata.get("type", "generic")
+        metrics.assembly_path_recorded(
+            self._ensemble_id,
+            path_type,
+            path.assembly_index,
+        )
+
+        # Record individual step types
+        for step in path.steps:
+            metrics.assembly_step_recorded(self._ensemble_id, step.step_type.value)
+
+        # Update aggregate metrics from AssemblyMetrics
+        if self._metrics.total_objects > 0:
+            metrics.set_assembly_index(
+                self._ensemble_id,
+                path_type,
+                self._metrics.max_assembly_index,
+            )
+            metrics.set_total_assembly(self._ensemble_id, self._metrics.total_assembly)
+            metrics.set_selection_signal(
+                self._ensemble_id,
+                self._metrics.selection_signal.value,
+            )
+
     def add_step(
         self,
         path_id: str,
@@ -163,6 +202,9 @@ class AssemblyTracker:
 
         path.complete()
         self._metrics.add_path(path)
+
+        # Record to Prometheus
+        self._record_prometheus_metrics(path)
 
         # Enforce max paths limit
         while len(self._metrics.paths) > self._max_paths:

@@ -21,6 +21,8 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
+from titan.metrics import get_metrics
+
 logger = logging.getLogger("titan.hive.stigmergy")
 
 
@@ -301,6 +303,10 @@ class PheromoneField:
         if self._redis:
             await self._store_trace_redis(trace)
 
+        # Record metrics
+        metrics = get_metrics()
+        metrics.pheromone_deposited(trace_type.value, location, trace.intensity)
+
         logger.debug(
             f"Deposited trace at {location}: type={trace_type.value}, "
             f"intensity={intensity:.2f}, depositor={agent_id}"
@@ -490,8 +496,14 @@ class PheromoneField:
         for candidate, intensity in intensities:
             cumulative += intensity
             if r <= cumulative:
+                # Record trail follow metrics
+                metrics = get_metrics()
+                metrics.trail_followed(trace_type.value)
                 return candidate
 
+        # Record trail follow for last candidate
+        metrics = get_metrics()
+        metrics.trail_followed(trace_type.value)
         return intensities[-1][0]
 
     async def decay_cycle(self) -> int:

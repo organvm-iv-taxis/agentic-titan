@@ -160,6 +160,70 @@ if PROMETHEUS_AVAILABLE:
     )
 
     # ========================================================================
+    # Batch Metrics
+    # ========================================================================
+
+    BATCH_SUBMITTED = Counter(
+        "titan_batch_submitted_total",
+        "Total batch jobs submitted",
+        ["workflow"],
+        registry=REGISTRY,
+    )
+
+    BATCH_STARTED = Counter(
+        "titan_batch_started_total",
+        "Total batch jobs started",
+        ["workflow"],
+        registry=REGISTRY,
+    )
+
+    BATCH_COMPLETED = Counter(
+        "titan_batch_completed_total",
+        "Total batch jobs completed",
+        ["workflow", "status"],
+        registry=REGISTRY,
+    )
+
+    BATCH_ACTIVE = Gauge(
+        "titan_batch_active",
+        "Number of active batch jobs",
+        registry=REGISTRY,
+    )
+
+    BATCH_SESSION_STARTED = Counter(
+        "titan_batch_session_started_total",
+        "Total batch sessions started",
+        registry=REGISTRY,
+    )
+
+    BATCH_SESSION_COMPLETED = Counter(
+        "titan_batch_session_completed_total",
+        "Total batch sessions completed",
+        ["status"],
+        registry=REGISTRY,
+    )
+
+    BATCH_TOKENS = Counter(
+        "titan_batch_tokens_total",
+        "Total tokens used by batch processing",
+        registry=REGISTRY,
+    )
+
+    BATCH_COST = Counter(
+        "titan_batch_cost_usd_total",
+        "Total cost of batch processing in USD",
+        registry=REGISTRY,
+    )
+
+    BATCH_DURATION = Histogram(
+        "titan_batch_duration_seconds",
+        "Batch job duration in seconds",
+        ["workflow"],
+        buckets=(60.0, 120.0, 300.0, 600.0, 1200.0, 1800.0, 3600.0, 7200.0),
+        registry=REGISTRY,
+    )
+
+    # ========================================================================
     # Memory Metrics
     # ========================================================================
 
@@ -266,6 +330,34 @@ if PROMETHEUS_AVAILABLE:
         "titan_learning_recommendations_total",
         "Total learning-based recommendations",
         ["recommended_topology"],
+        registry=REGISTRY,
+    )
+
+    LEARNING_SIGNALS = Counter(
+        "titan_learning_signals_total",
+        "Total learning signals recorded",
+        ["signal_type"],
+        registry=REGISTRY,
+    )
+
+    LEARNING_REWARD = Histogram(
+        "titan_learning_reward",
+        "Reward values from learning pipeline",
+        buckets=(-1.0, -0.5, -0.25, 0.0, 0.25, 0.5, 0.75, 1.0),
+        registry=REGISTRY,
+    )
+
+    LEARNING_CONFIDENCE = Histogram(
+        "titan_learning_confidence",
+        "Confidence values from learning pipeline",
+        buckets=(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0),
+        registry=REGISTRY,
+    )
+
+    RLHF_SAMPLES = Counter(
+        "titan_rlhf_samples_total",
+        "Total RLHF samples collected",
+        ["feedback_type"],
         registry=REGISTRY,
     )
 
@@ -483,6 +575,58 @@ class MetricsCollector:
             AGENT_DURATION.labels(archetype=archetype).observe(duration)
 
     # ========================================================================
+    # Batch Metrics
+    # ========================================================================
+
+    def batch_submitted(self, workflow: str) -> None:
+        """Record batch submission."""
+        if not self._enabled:
+            return
+        BATCH_SUBMITTED.labels(workflow=workflow).inc()
+
+    def batch_started(self, workflow: str) -> None:
+        """Record batch started."""
+        if not self._enabled:
+            return
+        BATCH_STARTED.labels(workflow=workflow).inc()
+        BATCH_ACTIVE.inc()
+
+    def batch_completed(
+        self,
+        workflow: str,
+        status: str,
+        duration_seconds: float,
+        tokens: int = 0,
+        cost_usd: float = 0.0,
+    ) -> None:
+        """Record batch completion."""
+        if not self._enabled:
+            return
+        BATCH_COMPLETED.labels(workflow=workflow, status=status).inc()
+        BATCH_ACTIVE.dec()
+        BATCH_DURATION.labels(workflow=workflow).observe(duration_seconds)
+        if tokens > 0:
+            BATCH_TOKENS.inc(tokens)
+        if cost_usd > 0:
+            BATCH_COST.inc(cost_usd)
+
+    def batch_session_started(self) -> None:
+        """Record batch session started."""
+        if not self._enabled:
+            return
+        BATCH_SESSION_STARTED.inc()
+
+    def batch_session_completed(self, status: str, tokens: int = 0, cost_usd: float = 0.0) -> None:
+        """Record batch session completion."""
+        if not self._enabled:
+            return
+        BATCH_SESSION_COMPLETED.labels(status=status).inc()
+        if tokens > 0:
+            BATCH_TOKENS.inc(tokens)
+        if cost_usd > 0:
+            BATCH_COST.inc(cost_usd)
+
+    # ========================================================================
     # Topology Metrics
     # ========================================================================
 
@@ -653,6 +797,20 @@ class MetricsCollector:
         if not self._enabled:
             return
         LEARNING_RECOMMENDATIONS.labels(recommended_topology=recommended_topology).inc()
+
+    def learning_signal_recorded(self, reward: float, confidence: float) -> None:
+        """Record learning signal from pipeline."""
+        if not self._enabled:
+            return
+        LEARNING_REWARD.observe(reward)
+        LEARNING_CONFIDENCE.observe(confidence)
+        LEARNING_SIGNALS.labels(signal_type="reward").inc()
+
+    def rlhf_sample_collected(self, feedback_type: str) -> None:
+        """Record RLHF sample collection."""
+        if not self._enabled:
+            return
+        RLHF_SAMPLES.labels(feedback_type=feedback_type).inc()
 
     # ========================================================================
     # Assembly Theory Metrics

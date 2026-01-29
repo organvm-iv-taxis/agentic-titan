@@ -22,6 +22,7 @@ from titan.batch.models import (
     QueuedSession,
     SessionQueueStatus,
 )
+from titan.metrics import get_metrics
 from titan.workflows.inquiry_config import get_workflow, list_workflows
 
 if TYPE_CHECKING:
@@ -252,6 +253,10 @@ class BatchOrchestrator:
         # Persist to HiveMind
         await self._persist_batch(batch)
 
+        # Record metrics
+        metrics = get_metrics()
+        metrics.batch_submitted(request.workflow)
+
         logger.info(
             f"Submitted batch {batch.id} with {len(batch.topics)} topics, "
             f"workflow={request.workflow}, max_concurrent={batch.max_concurrent}"
@@ -285,6 +290,10 @@ class BatchOrchestrator:
 
         # Mark as processing
         batch.mark_started()
+
+        # Record metrics
+        metrics = get_metrics()
+        metrics.batch_started(batch.workflow_name)
 
         # Notify handlers
         for handler in self._on_batch_started:
@@ -448,6 +457,10 @@ class BatchOrchestrator:
 
         session.mark_running(worker_id)
 
+        # Record metrics
+        metrics = get_metrics()
+        metrics.batch_session_started()
+
         # Notify handlers
         for handler in self._on_session_started:
             try:
@@ -491,6 +504,10 @@ class BatchOrchestrator:
         session.mark_completed(artifact_uri, tokens_used, cost_usd)
         if inquiry_session_id:
             session.inquiry_session_id = inquiry_session_id
+
+        # Record metrics
+        metrics = get_metrics()
+        metrics.batch_session_completed("completed", tokens_used, cost_usd)
 
         # Notify handlers
         for handler in self._on_session_completed:
@@ -548,6 +565,9 @@ class BatchOrchestrator:
             await self._requeue_session(batch, session)
         else:
             session.mark_failed(error)
+            # Record failed session metrics
+            metrics = get_metrics()
+            metrics.batch_session_completed("failed", session.tokens_used, session.cost_usd)
             await self._check_batch_completion(batch)
 
         await self._persist_batch(batch)
@@ -764,6 +784,21 @@ class BatchOrchestrator:
 
         if progress.is_complete:
             batch.mark_completed()
+
+            # Calculate duration
+            duration_seconds = 0.0
+            if batch.started_at and batch.completed_at:
+                duration_seconds = (batch.completed_at - batch.started_at).total_seconds()
+
+            # Record metrics
+            metrics = get_metrics()
+            metrics.batch_completed(
+                workflow=batch.workflow_name,
+                status=batch.status.value,
+                duration_seconds=duration_seconds,
+                tokens=batch.total_tokens,
+                cost_usd=batch.total_cost_usd,
+            )
 
             # Notify handlers
             for handler in self._on_batch_completed:

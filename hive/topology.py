@@ -22,6 +22,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 from agents.framework.errors import InvalidTopologyError, TopologyError
+from titan.metrics import get_metrics
 
 if TYPE_CHECKING:
     from hive.memory import HiveMind
@@ -240,6 +241,11 @@ class SwarmTopology(BaseTopology):
             existing.neighbors.append(agent_id)
 
         self.nodes[agent_id] = node
+
+        # Record neighbor interaction metrics
+        metrics = get_metrics()
+        metrics.neighbor_interaction("swarm_add")
+
         logger.debug(f"Added agent {agent_id} to swarm")
         return node
 
@@ -1176,6 +1182,12 @@ class TopologyEngine:
                 await self.hive_mind.set_topology(new_topology.to_dict())
 
             duration_ms = (time.time() - start_time) * 1000
+            duration_seconds = duration_ms / 1000
+
+            # Record topology switch metrics
+            metrics = get_metrics()
+            metrics.topology_switch(old_type, new_type_value, duration_seconds)
+            metrics.set_topology(new_type_value, len(new_topology.nodes))
 
             # Emit TOPOLOGY_CHANGED event
             if self._event_bus:

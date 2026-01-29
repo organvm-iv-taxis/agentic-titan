@@ -1,0 +1,190 @@
+---
+# Ray Cluster for Titan
+# Provides distributed compute alongside Celery for inquiry and batch processing
+#
+# Prerequisites:
+# - K3s cluster with KubeRay operator installed
+# - kubectl apply -f https://raw.githubusercontent.com/ray-project/kuberay/master/ray-operator/config/crd/bases/ray.io_rayclusters.yaml
+#
+# Install KubeRay operator:
+# helm install kuberay-operator kuberay/kuberay-operator --version 1.0.0
+#
+# Usage:
+# kubectl apply -f ray-cluster.yaml
+
+apiVersion: ray.io/v1
+kind: RayCluster
+metadata:
+  name: titan-ray
+  namespace: titan
+  labels:
+    app: titan
+    component: ray-cluster
+spec:
+  # Ray version
+  rayVersion: "2.9.0"
+
+  # Enable autoscaling
+  enableInTreeAutoscaling: true
+
+  # Head node configuration
+  headGroupSpec:
+    serviceType: ClusterIP
+    replicas: 1
+
+    rayStartParams:
+      dashboard-host: "0.0.0.0"
+      block: "true"
+      num-cpus: "0"  # Head node for coordination only
+
+    template:
+      metadata:
+        labels:
+          app: titan
+          component: ray-head
+      spec:
+        containers:
+          - name: ray-head
+            image: rayproject/ray:2.9.0-py310
+            ports:
+              - containerPort: 6379
+                name: gcs
+              - containerPort: 8265
+                name: dashboard
+              - containerPort: 10001
+                name: client
+              - containerPort: 8000
+                name: serve
+            env:
+              - name: RAY_ENABLE_RECORD_ACTOR_TASK_LOGGING
+                value: "1"
+              - name: RAY_NAMESPACE
+                value: "titan"
+            resources:
+              requests:
+                cpu: "500m"
+                memory: "1Gi"
+              limits:
+                cpu: "1"
+                memory: "2Gi"
+            lifecycle:
+              preStop:
+                exec:
+                  command: ["/bin/sh", "-c", "ray stop"]
+            volumeMounts:
+              - name: ray-logs
+                mountPath: /tmp/ray
+        volumes:
+          - name: ray-logs
+            emptyDir: {}
+
+  # Worker nodes configuration
+  workerGroupSpecs:
+    - groupName: workers
+      replicas: 2
+      minReplicas: 1
+      maxReplicas: 10
+
+      rayStartParams:
+        block: "true"
+
+      template:
+        metadata:
+          labels:
+            app: titan
+            component: ray-worker
+        spec:
+          containers:
+            - name: ray-worker
+              image: rayproject/ray:2.9.0-py310
+              env:
+                - name: RAY_ENABLE_RECORD_ACTOR_TASK_LOGGING
+                  value: "1"
+              resources:
+                requests:
+                  cpu: "1"
+                  memory: "2Gi"
+                limits:
+                  cpu: "2"
+                  memory: "4Gi"
+              lifecycle:
+                preStop:
+                  exec:
+                    command: ["/bin/sh", "-c", "ray stop"]
+              volumeMounts:
+                - name: ray-logs
+                  mountPath: /tmp/ray
+          volumes:
+            - name: ray-logs
+              emptyDir: {}
+
+---
+# Service for Ray head
+apiVersion: v1
+kind: Service
+metadata:
+  name: titan-ray-head
+  namespace: titan
+  labels:
+    app: titan
+    component: ray-head
+spec:
+  type: ClusterIP
+  selector:
+    app: titan
+    component: ray-head
+  ports:
+    - name: gcs
+      port: 6379
+      targetPort: 6379
+    - name: dashboard
+      port: 8265
+      targetPort: 8265
+    - name: client
+      port: 10001
+      targetPort: 10001
+    - name: serve
+      port: 8000
+      targetPort: 8000
+
+---
+# Ingress for Ray dashboard (optional)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: titan-ray-dashboard
+  namespace: titan
+  annotations:
+    kubernetes.io/ingress.class: traefik
+spec:
+  rules:
+    - host: ray.titan.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: titan-ray-head
+                port:
+                  number: 8265
+
+---
+# ConfigMap for Ray configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: titan-ray-config
+  namespace: titan
+  labels:
+    app: titan
+    component: ray
+data:
+  RAY_ADDRESS: "titan-ray-head:6379"
+  RAY_NAMESPACE: "titan"
+  RAY_HTTP_HOST: "0.0.0.0"
+  RAY_HTTP_PORT: "8000"
+  RAY_REPLICAS: "2"
+  RAY_MAX_REPLICAS: "10"
+  RAY_MIN_REPLICAS: "1"
+  RAY_AUTOSCALING: "true"
