@@ -270,8 +270,38 @@ class TitanDashboard:
                 },
             )
 
+        @self.app.get("/lexicon", response_class=HTMLResponse)
+        async def lexicon_page(request: Request) -> HTMLResponse:
+            """Organizational Body Lexicon visualization page."""
+            return templates.TemplateResponse(
+                "lexicon.html",
+                {
+                    "request": request,
+                    "title": "Body Lexicon",
+                },
+            )
+        async def knowledge_page(request: Request) -> HTMLResponse:
+            """Knowledge graph browser page."""
+            return templates.TemplateResponse(
+                "knowledge.html",
+                {
+                    "request": request,
+                    "title": "Knowledge Graph",
+                },
+            )
+
         # ====================================================================
         # API Routes
+        @self.app.get("/api/knowledge/lexicon")
+        async def get_lexicon() -> dict[str, Any]:
+            """Get organizational body lexicon."""
+            try:
+                import yaml
+                with open("data/lexicon/seed_lexicon.yaml") as f:
+                    return yaml.safe_load(f)
+            except Exception as e:
+                logger.error(f"Error loading lexicon: {e}")
+                return {}
         # ====================================================================
 
         @self.app.get("/api/status", response_model=StatusResponse)
