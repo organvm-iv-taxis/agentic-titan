@@ -34,11 +34,15 @@ STAGE_PROMPTS: dict[str, str] = {
     # Stage 1: Scope Clarification (Scope AI)
     # -------------------------------------------------------------------------
     "scope_clarification": """<system>
-You are a Scope Clarification AI. Your role is to take any topic and distill it into a single, precise, actionable sentence that captures the core inquiry. You bring clarity to complexity.
+You are a Scope Clarification AI. Your role is to take any topic and distill it
+into a single, precise, actionable sentence that captures the core inquiry.
+You bring clarity to complexity.
 </system>
 
 <task>
-Restate the following topic as a clear, focused question or statement that serves as the foundation for deep exploration. Consider what aspects are most essential and what might be peripheral.
+Restate the following topic as a clear, focused question or statement that serves
+as the foundation for deep exploration. Consider what aspects are most essential
+and what might be peripheral.
 
 Topic: {topic}
 </task>
@@ -63,12 +67,13 @@ Format your response as structured markdown with:
 - Focus on clarity over comprehensiveness
 - Prioritize actionable insights
 </constraints>""",
-
     # -------------------------------------------------------------------------
     # Stage 2: Logical Branching (Logic AI)
     # -------------------------------------------------------------------------
     "logical_branching": """<system>
-You are a Logic AI specialized in systematic rational exploration. You build rigorous logical frameworks and follow chains of reasoning with precision. You think like a philosopher crossed with a scientist.
+You are a Logic AI specialized in systematic rational exploration. You build
+rigorous logical frameworks and follow chains of reasoning with precision.
+You think like a philosopher crossed with a scientist.
 </system>
 
 <context>
@@ -109,12 +114,13 @@ Format your response as structured markdown with:
 - Maintain logical rigor throughout
 - Clearly mark uncertainty vs established reasoning
 </constraints>""",
-
     # -------------------------------------------------------------------------
     # Stage 3: Intuitive Branching (Mythos AI)
     # -------------------------------------------------------------------------
     "intuitive_branching": """<system>
-You are a Mythos AI that thinks in stories, metaphors, and archetypal patterns. You reveal hidden dimensions of topics through narrative and symbol. You speak the language of dreams and mythology.
+You are a Mythos AI that thinks in stories, metaphors, and archetypal patterns.
+You reveal hidden dimensions of topics through narrative and symbol.
+You speak the language of dreams and mythology.
 </system>
 
 <context>
@@ -148,12 +154,13 @@ Format your response as structured markdown with:
 - Balance metaphorical depth with accessibility
 - Connect symbols to concrete insights
 </constraints>""",
-
     # -------------------------------------------------------------------------
     # Stage 4: Lateral Exploration (Bridge AI)
     # -------------------------------------------------------------------------
     "lateral_exploration": """<system>
-You are a Bridge AI that specializes in finding unexpected connections between seemingly unrelated domains. You think laterally, drawing surprising parallels that reveal new perspectives. You are a master of analogical reasoning.
+You are a Bridge AI that specializes in finding unexpected connections between
+seemingly unrelated domains. You think laterally, drawing surprising parallels
+that reveal new perspectives. You are a master of analogical reasoning.
 </system>
 
 <context>
@@ -187,12 +194,13 @@ Format your response as structured markdown with:
 - Prioritize surprising yet substantive connections
 - Each analogy should be actionable, not just clever
 </constraints>""",
-
     # -------------------------------------------------------------------------
     # Stage 5: Recursive Design (Meta AI)
     # -------------------------------------------------------------------------
     "recursive_design": """<system>
-You are a Meta AI that designs self-improving recursive systems. You think about thinking itself, creating feedback loops that refine and evolve understanding. You see inquiry as a living process.
+You are a Meta AI that designs self-improving recursive systems. You think
+about thinking itself, creating feedback loops that refine and evolve
+understanding. You see inquiry as a living process.
 </system>
 
 <context>
@@ -234,12 +242,13 @@ Format your response as structured markdown with:
 - Focus on actionable feedback mechanisms
 - Balance abstraction with concrete recommendations
 </constraints>""",
-
     # -------------------------------------------------------------------------
     # Stage 6: Pattern Recognition (Pattern AI)
     # -------------------------------------------------------------------------
     "pattern_recognition": """<system>
-You are a Pattern AI that recognizes emergent structures and meta-patterns across complex information. You see the forest AND the trees, identifying both local details and global structures. You synthesize across modalities.
+You are a Pattern AI that recognizes emergent structures and meta-patterns
+across complex information. You see the forest AND the trees, identifying both
+local details and global structures. You synthesize across modalities.
 </system>
 
 <context>
@@ -277,7 +286,9 @@ Format your response as structured markdown with:
 
 ## Collaborative Summary
 
-Finally, provide a brief synthesis of how this multi-perspective exploration has revealed dimensions of the topic that no single approach could have uncovered alone.
+Finally, provide a brief synthesis of how this multi-perspective exploration has
+revealed dimensions of the topic that no single approach could have uncovered
+alone.
 </output_format>
 
 <constraints>
@@ -293,7 +304,9 @@ Finally, provide a brief synthesis of how this multi-perspective exploration has
 
 # Shorter prompts for faster iteration and budget conservation
 CONCISE_STAGE_PROMPTS: dict[str, str] = {
-    "scope_clarification": """<system>You are Scope AI. Distill topics into focused questions.</system>
+    "scope_clarification": """<system>
+You are Scope AI. Distill topics into focused questions.
+</system>
 
 <task>Topic: {topic}</task>
 
@@ -304,7 +317,6 @@ CONCISE_STAGE_PROMPTS: dict[str, str] = {
 </output_format>
 
 <constraints>Be concise but insightful. ~150 words max.</constraints>""",
-
     "logical_branching": """<system>You are Logic AI. Build rigorous logical frameworks.</system>
 
 <context>{previous_context}</context>
@@ -318,8 +330,9 @@ CONCISE_STAGE_PROMPTS: dict[str, str] = {
 </output_format>
 
 <constraints>Use rigorous logical reasoning. ~250 words max.</constraints>""",
-
-    "intuitive_branching": """<system>You are Mythos AI. Explore through metaphor and story.</system>
+    "intuitive_branching": """<system>
+You are Mythos AI. Explore through metaphor and story.
+</system>
 
 <context>{previous_context}</context>
 
@@ -332,8 +345,9 @@ CONCISE_STAGE_PROMPTS: dict[str, str] = {
 </output_format>
 
 <constraints>Think in stories and archetypes. ~200 words max.</constraints>""",
-
-    "lateral_exploration": """<system>You are Bridge AI. Find unexpected cross-domain connections.</system>
+    "lateral_exploration": """<system>
+You are Bridge AI. Find unexpected cross-domain connections.
+</system>
 
 <context>{previous_context}</context>
 
@@ -346,7 +360,6 @@ CONCISE_STAGE_PROMPTS: dict[str, str] = {
 </output_format>
 
 <constraints>Think laterally and creatively. ~200 words max.</constraints>""",
-
     "recursive_design": """<system>You are Meta AI. Design self-improving inquiry systems.</system>
 
 <context>{previous_context}</context>
@@ -362,8 +375,9 @@ CONCISE_STAGE_PROMPTS: dict[str, str] = {
 </output_format>
 
 <constraints>Think about thinking. ~200 words max.</constraints>""",
-
-    "pattern_recognition": """<system>You are Pattern AI. Synthesize and recognize emergent structures.</system>
+    "pattern_recognition": """<system>
+You are Pattern AI. Synthesize and recognize emergent structures.
+</system>
 
 <context>{previous_context}</context>
 
@@ -395,7 +409,7 @@ def get_prompt(
     *,
     concise: bool = False,
     max_context_tokens: int | None = None,
-    token_optimizer: "TokenOptimizer | None" = None,
+    token_optimizer: TokenOptimizer | None = None,
 ) -> str:
     """
     Get a formatted prompt for an inquiry stage.
@@ -446,7 +460,7 @@ def get_prompt_with_budget_awareness(
     total_stages: int = 6,
     budget_remaining: float | None = None,
     budget_total: float | None = None,
-    token_optimizer: "TokenOptimizer | None" = None,
+    token_optimizer: TokenOptimizer | None = None,
 ) -> tuple[str, bool]:
     """
     Get a prompt with automatic budget-aware variant selection.
@@ -493,7 +507,7 @@ def list_templates() -> list[str]:
     return list(STAGE_PROMPTS.keys())
 
 
-def get_template_info(template_key: str) -> dict[str, str]:
+def get_template_info(template_key: str) -> dict[str, str | bool]:
     """Get information about a template."""
     roles = {
         "scope_clarification": "Scope AI",

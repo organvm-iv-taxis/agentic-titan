@@ -193,8 +193,12 @@ class FirecrackerNetwork:
                             f"-s {tap.config.cidr} -j MASQUERADE",
                             check=False,
                         )
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        logger.debug(
+                            "Failed to remove NAT rule for %s during cleanup: %s",
+                            name,
+                            exc,
+                        )
 
                 # Delete the device
                 await self._run_command(f"ip link delete {name}", check=False)
@@ -249,8 +253,12 @@ class FirecrackerNetwork:
             try:
                 await self._run_command(f"ip netns delete {ns_name}", check=False)
                 await self._run_command(f"ip link delete {veth_host}", check=False)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug(
+                    "Failed namespace cleanup for %s: %s",
+                    ns_name,
+                    exc,
+                )
 
     async def setup_bridge(self) -> None:
         """Create a bridge for VM networking."""

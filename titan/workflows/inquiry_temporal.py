@@ -11,17 +11,17 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 if TYPE_CHECKING:
-    from titan.workflows.inquiry_engine import InquirySession, StageResult
+    from titan.workflows.inquiry_engine import InquiryEngine, InquirySession, StageResult
 
 logger = logging.getLogger("titan.workflows.temporal")
 
 
-class DriftType(str, Enum):
+class DriftType(StrEnum):
     """Types of drift between inquiry versions."""
 
     EXPANSION = "expansion"  # New topics/concepts added
@@ -137,12 +137,19 @@ class TemporalChain:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> TemporalChain:
         """Create from dictionary."""
+        created_at = (
+            datetime.fromisoformat(data["created_at"]) if data.get("created_at") else datetime.now()
+        )
+        last_inquiry_at = (
+            datetime.fromisoformat(data["last_inquiry_at"]) if data.get("last_inquiry_at") else None
+        )
+
         return cls(
             chain_id=data["chain_id"],
             topic=data["topic"],
             sessions=data["sessions"],
-            created_at=datetime.fromisoformat(data["created_at"]) if data.get("created_at") else datetime.now(),
-            last_inquiry_at=datetime.fromisoformat(data["last_inquiry_at"]) if data.get("last_inquiry_at") else None,
+            created_at=created_at,
+            last_inquiry_at=last_inquiry_at,
             total_inquiries=data.get("total_inquiries", len(data.get("sessions", []))),
             metadata=data.get("metadata", {}),
         )
@@ -274,8 +281,7 @@ class TemporalTracker:
 
                 if diff.drift_score > 0.3:
                     key_changes.append(
-                        f"{stage_name}: {diff.drift_type.value} "
-                        f"(drift: {diff.drift_score:.0%})"
+                        f"{stage_name}: {diff.drift_type.value} (drift: {diff.drift_score:.0%})"
                     )
             elif base_result and not comp_result:
                 # Stage removed
@@ -358,9 +364,29 @@ class TemporalTracker:
 
         # Filter stopwords and get top themes
         stopwords = {
-            "this", "that", "with", "from", "have", "been", "were", "which",
-            "their", "about", "would", "could", "there", "these", "through",
-            "being", "also", "more", "other", "some", "what", "when", "into",
+            "this",
+            "that",
+            "with",
+            "from",
+            "have",
+            "been",
+            "were",
+            "which",
+            "their",
+            "about",
+            "would",
+            "could",
+            "there",
+            "these",
+            "through",
+            "being",
+            "also",
+            "more",
+            "other",
+            "some",
+            "what",
+            "when",
+            "into",
         }
 
         themes = sorted(
@@ -455,7 +481,7 @@ def get_temporal_tracker() -> TemporalTracker:
 
 async def create_re_inquiry(
     original_session: InquirySession,
-    engine: Any,  # InquiryEngine
+    engine: InquiryEngine,
 ) -> InquirySession:
     """
     Create a re-inquiry session linked to an original.

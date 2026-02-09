@@ -9,8 +9,8 @@ This module provides:
 
 from titan.core.project_context import (
     ProjectContext,
-    load_project_context,
     find_titan_md,
+    load_project_context,
 )
 
 __all__ = [

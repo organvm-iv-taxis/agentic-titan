@@ -9,8 +9,7 @@ tone, abstraction, verbosity, creativity, and technicality.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from enum import Enum
+from dataclasses import dataclass
 from typing import Any
 
 logger = logging.getLogger("titan.workflows.personality")

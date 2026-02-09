@@ -16,16 +16,16 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from titan.costs.router import CostAwareRouter, ModelInfo
+    from titan.costs.router import CostAwareRouter
 
 logger = logging.getLogger("titan.workflows.cognitive_router")
 
 
-class CognitiveTaskType(str, Enum):
+class CognitiveTaskType(StrEnum):
     """Types of cognitive tasks with different model requirements."""
 
     STRUCTURED_REASONING = "structured_reasoning"
@@ -214,8 +214,7 @@ class CognitiveRouter:
                 )
             else:
                 logger.warning(
-                    f"Preferred model {preferred_model} not available, "
-                    f"falling back to routing"
+                    f"Preferred model {preferred_model} not available, falling back to routing"
                 )
 
         # Get ranked models for this task type
@@ -278,11 +277,7 @@ class CognitiveRouter:
     ) -> list[str]:
         """Get alternative models for a task type."""
         candidates = COGNITIVE_MODEL_MAP.get(task_type, [])
-        available = [
-            m
-            for m in candidates
-            if self._is_model_available(m) and m != exclude
-        ]
+        available = [m for m in candidates if self._is_model_available(m) and m != exclude]
         return available[:3]
 
     def _get_model_strengths(
@@ -293,7 +288,9 @@ class CognitiveRouter:
         """Get a description of model strengths for this task type."""
         strengths_map = {
             "claude-3-5-sonnet-20241022": {
-                CognitiveTaskType.STRUCTURED_REASONING: "logical consistency and structured analysis",
+                CognitiveTaskType.STRUCTURED_REASONING: (
+                    "logical consistency and structured analysis"
+                ),
                 CognitiveTaskType.META_ANALYSIS: "consistency in self-referential thinking",
                 CognitiveTaskType.PATTERN_RECOGNITION: "balanced pattern recognition",
                 CognitiveTaskType.RESEARCH_SYNTHESIS: "coherent integration of diverse sources",

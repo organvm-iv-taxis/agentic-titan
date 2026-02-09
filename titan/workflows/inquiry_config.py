@@ -12,11 +12,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class CognitiveStyle(str, Enum):
+class CognitiveStyle(StrEnum):
     """Cognitive styles for inquiry stages."""
 
     STRUCTURED_REASONING = "structured_reasoning"
@@ -27,7 +27,7 @@ class CognitiveStyle(str, Enum):
     PATTERN_RECOGNITION = "pattern_recognition"
 
 
-class InfluenceMode(str, Enum):
+class InfluenceMode(StrEnum):
     """How user interjections influence the inquiry."""
 
     CONTEXT = "context"  # Add to context for subsequent stages
@@ -77,7 +77,11 @@ class UserInterjection:
             content=data["content"],
             injected_at_stage=data["injected_at_stage"],
             influence_mode=InfluenceMode(data.get("influence_mode", "context")),
-            timestamp=datetime.fromisoformat(data["timestamp"]) if data.get("timestamp") else datetime.now(),
+            timestamp=(
+                datetime.fromisoformat(data["timestamp"])
+                if data.get("timestamp")
+                else datetime.now()
+            ),
             processed=data.get("processed", False),
             metadata=data.get("metadata", {}),
         )
@@ -168,8 +172,7 @@ class InquiryWorkflow:
                 for idx in group:
                     if idx < 0 or idx >= num_stages:
                         raise ValueError(
-                            f"Invalid parallel stage index {idx}, "
-                            f"workflow has {num_stages} stages"
+                            f"Invalid parallel stage index {idx}, workflow has {num_stages} stages"
                         )
 
     def get_stage(self, index: int) -> InquiryStage | None:
@@ -209,7 +212,7 @@ SCOPE_CLARIFICATION_STAGE = InquiryStage(
     prompt_template="scope_clarification",
     cognitive_style=CognitiveStyle.STRUCTURED_REASONING,
     model_traits=["precise", "focused", "clarifying"],
-    emoji="\U0001F3AF",  # Direct hit
+    emoji="\U0001f3af",  # Direct hit
     color="blue",
 )
 
@@ -220,7 +223,7 @@ LOGICAL_BRANCHING_STAGE = InquiryStage(
     prompt_template="logical_branching",
     cognitive_style=CognitiveStyle.STRUCTURED_REASONING,
     model_traits=["logical", "systematic", "rigorous"],
-    emoji="\U0001F9E0",  # Brain
+    emoji="\U0001f9e0",  # Brain
     color="green",
 )
 
@@ -231,7 +234,7 @@ INTUITIVE_BRANCHING_STAGE = InquiryStage(
     prompt_template="intuitive_branching",
     cognitive_style=CognitiveStyle.CREATIVE_SYNTHESIS,
     model_traits=["creative", "metaphorical", "narrative"],
-    emoji="\U0001F4A1",  # Light bulb
+    emoji="\U0001f4a1",  # Light bulb
     color="purple",
 )
 
@@ -242,7 +245,7 @@ LATERAL_EXPLORATION_STAGE = InquiryStage(
     prompt_template="lateral_exploration",
     cognitive_style=CognitiveStyle.CROSS_DOMAIN,
     model_traits=["creative", "pattern-matching", "broad-knowledge"],
-    emoji="\U0001F310",  # Globe with meridians
+    emoji="\U0001f310",  # Globe with meridians
     color="orange",
 )
 
@@ -253,7 +256,7 @@ RECURSIVE_DESIGN_STAGE = InquiryStage(
     prompt_template="recursive_design",
     cognitive_style=CognitiveStyle.META_ANALYSIS,
     model_traits=["consistent", "analytical", "self-referential"],
-    emoji="\U0001F504",  # Counterclockwise arrows
+    emoji="\U0001f504",  # Counterclockwise arrows
     color="red",
 )
 
@@ -264,7 +267,7 @@ PATTERN_RECOGNITION_STAGE = InquiryStage(
     prompt_template="pattern_recognition",
     cognitive_style=CognitiveStyle.PATTERN_RECOGNITION,
     model_traits=["analytical", "synthesizing", "emergent"],
-    emoji="\U0001F332",  # Evergreen tree
+    emoji="\U0001f332",  # Evergreen tree
     color="indigo",
 )
 

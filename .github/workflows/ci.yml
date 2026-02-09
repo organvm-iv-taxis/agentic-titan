@@ -25,10 +25,70 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
 
-  lint:
-    name: Lint
+  dependency-integrity:
+    name: Dependency Integrity
     runs-on: ubuntu-latest
-    continue-on-error: true  # Don't fail build on lint issues
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install core dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install pytest
+
+      - name: Verify core imports
+        run: |
+          python -c "import titan; import titan.workflows"
+
+      - name: Verify workflow test collection
+        run: |
+          pytest tests/workflows/test_inquiry_engine.py --collect-only -q
+
+  core-boundary-governance:
+    name: Core Boundary Governance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Validate core boundary manifest
+        run: |
+          python .ci/check_core_boundary_manifest.py
+
+  import-boundary-tests:
+    name: Import Boundary Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install pytest
+
+      - name: Run import boundary fitness tests
+        run: |
+          pytest tests/integration/test_import_boundaries.py -q
+
+  lint:
+    name: Lint (Blocking - Core Import Boundary Scope)
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -43,15 +103,62 @@ jobs:
           pip install ruff
 
       - name: Run ruff check
-        run: ruff check . --output-format=github || true
+        run: |
+          xargs ruff check --output-format=github < .ci/core_import_boundary_files.txt
 
       - name: Run ruff format check
+        run: |
+          xargs ruff format --check < .ci/core_import_boundary_files.txt
+
+  lint-full-advisory:
+    name: Lint (Advisory - Full Repo)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff
+
+      - name: Run full-repo ruff check
+        run: ruff check . --output-format=github || true
+
+      - name: Run full-repo ruff format check
         run: ruff format --check . || true
 
-  typecheck:
-    name: Type Check
+  typecheck-core:
+    name: Type Check (Blocking - Core Scope)
     runs-on: ubuntu-latest
-    continue-on-error: true  # Don't fail build on type issues
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install mypy
+
+      - name: Run mypy on core scope
+        run: |
+          xargs mypy --ignore-missing-imports --follow-imports=skip \
+            < .ci/typecheck_core_targets.txt
+
+  typecheck-full-advisory:
+    name: Type Check (Advisory - Full Repo)
+    runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
@@ -66,8 +173,41 @@ jobs:
           pip install -e ".[dashboard,metrics]"
           pip install mypy types-redis
 
-      - name: Run mypy
+      - name: Run full-repo mypy
         run: mypy --ignore-missing-imports hive agents titan mcp dashboard || true
+
+  test-core-blocking:
+    name: Test (Blocking - Full Suite, Python 3.11)
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dashboard,metrics]"
+          pip install pytest pytest-asyncio
+
+      - name: Run full test suite (quiet)
+        env:
+          REDIS_URL: redis://localhost:6379/0
+        run: |
+          pytest tests/ -q
 
   test:
     name: Test (Python ${{ matrix.python-version }})

@@ -5,17 +5,19 @@ Centralized Pydantic configuration for the Agentic Titan ecosystem.
 Supports environment variable overrides via .env.
 """
 
+# mypy: disable-error-code="misc,untyped-decorator"
+
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class LLMConfig(BaseSettings):
     """LLM Provider settings."""
+
     model_config = SettingsConfigDict(env_prefix="TITAN_LLM_")
-    
+
     default_model: str = "claude-3-5-sonnet-20241022"
     fast_model: str = "claude-3-5-haiku-20241022"
     creative_model: str = "gpt-4o"
@@ -25,8 +27,9 @@ class LLMConfig(BaseSettings):
 
 class RedisConfig(BaseSettings):
     """Redis connection settings."""
+
     model_config = SettingsConfigDict(env_prefix="TITAN_REDIS_")
-    
+
     url: str = "redis://localhost:6379"
     db: int = 0
     timeout: int = 5
@@ -34,11 +37,12 @@ class RedisConfig(BaseSettings):
 
 class TitanConfig(BaseSettings):
     """Global configuration for Agentic Titan."""
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         env_prefix="TITAN_",
-        extra="ignore"
+        extra="ignore",
     )
 
     # General
@@ -71,7 +75,8 @@ class TitanConfig(BaseSettings):
 
 
 # Singleton instance
-_config: Optional[TitanConfig] = None
+_config: TitanConfig | None = None
+
 
 def get_config() -> TitanConfig:
     """Get the global configuration instance."""

@@ -9,13 +9,15 @@ Enables portable agent definitions that work across:
 Inspired by: Anthropic's skills repository YAML DSL
 """
 
+# mypy: disable-error-code="misc,untyped-decorator"
+
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from enum import Enum
+from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -30,7 +32,7 @@ logger = logging.getLogger("titan.spec")
 # ============================================================================
 
 
-class ToolProtocol(str, Enum):
+class ToolProtocol(StrEnum):
     """Supported tool protocols."""
 
     MCP = "mcp"
@@ -38,7 +40,7 @@ class ToolProtocol(str, Enum):
     HTTP = "http"
 
 
-class RuntimeType(str, Enum):
+class RuntimeType(StrEnum):
     """Supported runtime types."""
 
     LOCAL = "local"
@@ -46,10 +48,10 @@ class RuntimeType(str, Enum):
     SERVERLESS = "serverless"
 
 
-class AgentTier(str, Enum):
+class AgentTier(StrEnum):
     """Agent capability tiers."""
 
-    COGNITIVE = "cognitive"     # Complex reasoning
+    COGNITIVE = "cognitive"  # Complex reasoning
     OPERATIONAL = "operational"  # Task execution
     SPECIALIZED = "specialized"  # Domain-specific
 
@@ -113,7 +115,7 @@ class AgentSpecModel(BaseModel):
     api_version: str = Field(alias="apiVersion", default="titan/v1")
     kind: str = "Agent"
     metadata: AgentMetadata
-    spec: "AgentSpecInner"
+    spec: AgentSpecInner
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -269,9 +271,9 @@ class AgentSpec:
                 "timeoutMs": self.timeout_ms,
             },
         }
-        return yaml.dump(data, default_flow_style=False, sort_keys=False)
+        return cast(str, yaml.dump(data, default_flow_style=False, sort_keys=False))
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize spec to dictionary."""
         return {
             "apiVersion": "titan/v1",
@@ -318,7 +320,7 @@ class SpecRegistry:
         """Get a spec by ID."""
         return self._specs.get(agent_id)
 
-    def list(self) -> list[AgentSpec]:
+    def list_specs(self) -> list[AgentSpec]:
         """List all registered specs."""
         return list(self._specs.values())
 
@@ -338,7 +340,7 @@ class SpecRegistry:
         if not directory.is_dir():
             raise SpecValidationError(str(directory), ["Not a directory"])
 
-        specs = []
+        specs: list[AgentSpec] = []
         patterns = ["*.titan.yaml", "*.agent.yaml", "*.titan.yml", "*.agent.yml"]
 
         for pattern in patterns:
@@ -359,6 +361,10 @@ class SpecRegistry:
     def find_by_label(self, key: str, value: str) -> list[AgentSpec]:
         """Find specs with a specific label."""
         return [s for s in self._specs.values() if s.labels.get(key) == value]
+
+    def list(self) -> list[AgentSpec]:
+        """Backward-compatible alias for listing registered specs."""
+        return self.list_specs()
 
     def __len__(self) -> int:
         return len(self._specs)

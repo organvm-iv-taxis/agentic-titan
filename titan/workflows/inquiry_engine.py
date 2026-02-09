@@ -19,41 +19,42 @@ import json
 import logging
 import time
 import uuid
+from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
-from typing import TYPE_CHECKING, Any, AsyncGenerator, Callable
+from enum import StrEnum
+from typing import TYPE_CHECKING, Any
 
-from titan.workflows.inquiry_config import (
-    CognitiveStyle,
-    InfluenceMode,
-    InquiryStage,
-    InquiryWorkflow,
-    UserInterjection,
-    EXPANSIVE_INQUIRY_WORKFLOW,
-)
-from titan.workflows.inquiry_prompts import get_prompt, get_prompt_with_budget_awareness
+from titan.core.config import get_config
 from titan.workflows.cognitive_router import (
     CognitiveRouter,
     CognitiveTaskType,
     get_cognitive_router,
 )
-from titan.core.config import get_config
-from titan.workflows.inquiry_dag import (
-    InquiryDependencyGraph,
-    ExecutionMode,
+from titan.workflows.inquiry_config import (
+    EXPANSIVE_INQUIRY_WORKFLOW,
+    CognitiveStyle,
+    InfluenceMode,
+    InquiryStage,
+    InquiryWorkflow,
+    UserInterjection,
 )
+from titan.workflows.inquiry_dag import (
+    ExecutionMode,
+    InquiryDependencyGraph,
+)
+from titan.workflows.inquiry_prompts import get_prompt, get_prompt_with_budget_awareness
 
 if TYPE_CHECKING:
     from hive.memory import HiveMind
-    from titan.prompts.token_optimizer import TokenOptimizer
-    from titan.prompts.metrics import PromptTracker
     from titan.costs.budget import BudgetTracker
+    from titan.prompts.metrics import PromptTracker
+    from titan.prompts.token_optimizer import TokenOptimizer
 
 logger = logging.getLogger("titan.workflows.inquiry_engine")
 
 
-class InquiryStatus(str, Enum):
+class InquiryStatus(StrEnum):
     """Status of an inquiry session."""
 
     PENDING = "pending"
@@ -147,7 +148,7 @@ class InquirySession:
 
     def get_previous_context(
         self,
-        token_optimizer: "TokenOptimizer | None" = None,
+        token_optimizer: TokenOptimizer | None = None,
         max_tokens: int | None = None,
         use_summarization: bool = True,
     ) -> str:
@@ -182,17 +183,18 @@ class InquirySession:
             if estimate.estimated_tokens > max_tokens:
                 if use_summarization:
                     # Use stage result compression
-                    return token_optimizer.compress_stage_results(
+                    compressed_results = token_optimizer.compress_stage_results(
                         [r.to_dict() for r in self.results],
                         max_tokens_per_stage=max_tokens // max(len(self.results), 1),
                     )
+                    return str(compressed_results)
                 else:
                     # Use general compression
                     compression = token_optimizer.compress_context(
                         full_context,
                         max_tokens=max_tokens,
                     )
-                    return compression.compressed_text
+                    return str(compression.compressed_text)
 
         return full_context
 
@@ -225,8 +227,7 @@ class InquirySession:
     def get_interjections_for_stage(self, stage_index: int) -> list[UserInterjection]:
         """Get interjections relevant to a specific stage."""
         return [
-            i for i in self.interjections
-            if i.injected_at_stage < stage_index and not i.processed
+            i for i in self.interjections if i.injected_at_stage < stage_index and not i.processed
         ]
 
 
@@ -248,11 +249,11 @@ class InquiryEngine:
         cognitive_router: CognitiveRouter | None = None,
         hive_mind: HiveMind | None = None,
         llm_caller: Callable[[str, str], Any] | None = None,
-        default_model: str = get_config().llm.default_model,
-        token_optimizer: "TokenOptimizer | None" = None,
-        prompt_tracker: "PromptTracker | None" = None,
-        budget_tracker: "BudgetTracker | None" = None,
-        max_context_tokens: int = get_config().max_context_tokens,
+        default_model: str | None = None,
+        token_optimizer: TokenOptimizer | None = None,
+        prompt_tracker: PromptTracker | None = None,
+        budget_tracker: BudgetTracker | None = None,
+        max_context_tokens: int | None = None,
         quality_gates: list[Any] | None = None,
     ) -> None:
         """
@@ -263,12 +264,23 @@ class InquiryEngine:
             hive_mind: Shared memory for agents (optional)
             llm_caller: Function to call LLM (async). Signature: (prompt, model) -> response
             default_model: Fallback model when routing unavailable
+                (defaults to config if omitted)
             token_optimizer: Optimizer for context compression
             prompt_tracker: Tracker for prompt effectiveness metrics
             budget_tracker: Tracker for budget management
             max_context_tokens: Maximum tokens for accumulated context
+                (defaults to config if omitted)
             quality_gates: List of quality gates to run after stages
         """
+        if default_model is None or max_context_tokens is None:
+            config = get_config()
+            if default_model is None:
+                default_model = config.llm.default_model
+            if max_context_tokens is None:
+                max_context_tokens = config.max_context_tokens
+        assert default_model is not None
+        assert max_context_tokens is not None
+
         self._cognitive_router = cognitive_router or get_cognitive_router()
         self._hive_mind = hive_mind
         self._llm_caller = llm_caller
@@ -384,9 +396,9 @@ class InquiryEngine:
             session.started_at = datetime.now()
 
         # Notify handlers
-        for handler in self._on_stage_started:
+        for started_handler in self._on_stage_started:
             try:
-                handler(session, stage_index)
+                started_handler(session, stage_index)
             except Exception as e:
                 logger.warning(f"Stage started handler error: {e}")
 
@@ -437,7 +449,9 @@ class InquiryEngine:
             # Estimate prompt tokens
             prompt_tokens = 0
             if self._token_optimizer:
-                prompt_tokens = self._token_optimizer.estimate_tokens(prompt, model).estimated_tokens
+                prompt_tokens = self._token_optimizer.estimate_tokens(
+                    prompt, model
+                ).estimated_tokens
 
             result = StageResult(
                 stage_name=stage.name,
@@ -514,9 +528,9 @@ class InquiryEngine:
         session.results.append(result)
 
         # Notify handlers
-        for handler in self._on_stage_completed:
+        for completion_handler in self._on_stage_completed:
             try:
-                handler(session, result)
+                completion_handler(session, result)
             except Exception as e:
                 logger.warning(f"Stage completed handler error: {e}")
 
@@ -566,8 +580,7 @@ class InquiryEngine:
                         logger.warning(f"Session completed handler error: {e}")
 
             logger.info(
-                f"Workflow complete for session {session.id}. "
-                f"Ran {len(session.results)} stages."
+                f"Workflow complete for session {session.id}. Ran {len(session.results)} stages."
             )
 
         except Exception as e:
@@ -607,10 +620,7 @@ class InquiryEngine:
         Returns:
             The completed session
         """
-        logger.info(
-            f"Running DAG workflow for session {session.id} "
-            f"(mode: {execution_mode.value})"
-        )
+        logger.info(f"Running DAG workflow for session {session.id} (mode: {execution_mode.value})")
 
         # Build dependency graph from workflow
         graph = InquiryDependencyGraph.from_workflow(session.workflow)
@@ -729,10 +739,7 @@ class InquiryEngine:
             if session.status == InquiryStatus.CANCELLED:
                 break
 
-            logger.info(
-                f"Executing DAG level {level_idx + 1}/{len(levels)}: "
-                f"stages {level_stages}"
-            )
+            logger.info(f"Executing DAG level {level_idx + 1}/{len(levels)}: stages {level_stages}")
 
             if len(level_stages) == 1:
                 # Single stage - execute directly
@@ -1009,13 +1016,12 @@ class InquiryEngine:
                     # Wait for resume
                     while session.status == InquiryStatus.PAUSED:
                         await asyncio.sleep(0.1)
-                        # Check if cancelled while paused
-                        if session.status == InquiryStatus.CANCELLED:
-                            yield {
-                                "type": "session_cancelled",
-                                "session_id": session.id,
-                            }
-                            return
+                    if session.status == InquiryStatus.CANCELLED:
+                        yield {
+                            "type": "session_cancelled",
+                            "session_id": session.id,
+                        }
+                        return
                     yield {
                         "type": "session_resumed",
                         "session_id": session.id,
@@ -1160,7 +1166,7 @@ class InquiryEngine:
 
         # Use budget-aware prompt selection if budget info available
         if budget_remaining is not None and budget_total is not None:
-            return get_prompt_with_budget_awareness(
+            prompt_with_budget = get_prompt_with_budget_awareness(
                 template_key=stage.prompt_template,
                 topic=session.topic,
                 previous_context=previous_context,
@@ -1170,6 +1176,8 @@ class InquiryEngine:
                 budget_total=budget_total,
                 token_optimizer=self._token_optimizer,
             )
+            prompt_text, used_concise = prompt_with_budget
+            return str(prompt_text), bool(used_concise)
 
         # Standard prompt generation
         prompt = get_prompt(
@@ -1191,11 +1199,12 @@ class InquiryEngine:
     ) -> None:
         """Record epistemic signature metrics based on stage content and style."""
         from titan.metrics import get_metrics
+
         metrics = get_metrics()
-        
+
         # Estimate "intensity" based on response length and style
         intensity = min(len(content.split()) / 500.0, 1.0)
-        
+
         if style == CognitiveStyle.STRUCTURED_REASONING:
             metrics.set_inquiry_logic_density(session_id, intensity)
         elif style == CognitiveStyle.CREATIVE_SYNTHESIS:
@@ -1262,10 +1271,8 @@ def get_inquiry_engine() -> InquiryEngine:
     if _default_engine is None:
         # Import here to avoid circular dependency
         from titan.workflows.quality_gates import DialecticGate
-        
-        _default_engine = InquiryEngine(
-            quality_gates=[DialecticGate()]
-        )
+
+        _default_engine = InquiryEngine(quality_gates=[DialecticGate()])
     return _default_engine
 
 

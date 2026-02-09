@@ -8,10 +8,11 @@ Supports multiple narrative styles and voice preservation options.
 from __future__ import annotations
 
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Awaitable
+from enum import StrEnum
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from titan.workflows.inquiry_engine import InquirySession
@@ -19,7 +20,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger("titan.workflows.narrative")
 
 
-class NarrativeStyle(str, Enum):
+class NarrativeStyle(StrEnum):
     """Available narrative styles."""
 
     ACADEMIC = "academic"  # Formal, citation-style
@@ -30,7 +31,7 @@ class NarrativeStyle(str, Enum):
     TECHNICAL = "technical"  # Precise, detailed
 
 
-class TargetLength(str, Enum):
+class TargetLength(StrEnum):
     """Target length for narrative output."""
 
     BRIEF = "brief"  # 1-2 paragraphs
@@ -145,12 +146,14 @@ class NarrativeSynthesis:
             lines.append(section.content)
             lines.append("")
 
-        lines.extend([
-            "---",
-            f"*Topic: {self.topic}*",
-            f"*Session: {self.session_id}*",
-            f"*Generated: {self.created_at.isoformat()}*",
-        ])
+        lines.extend(
+            [
+                "---",
+                f"*Topic: {self.topic}*",
+                f"*Session: {self.session_id}*",
+                f"*Generated: {self.created_at.isoformat()}*",
+            ]
+        )
 
         return "\n".join(lines)
 
@@ -166,12 +169,20 @@ class NarrativeSynthesizer:
 
     # Style-specific templates
     STYLE_INTRODUCTIONS = {
-        NarrativeStyle.ACADEMIC: "This analysis examines {topic} through multiple methodological lenses.",
-        NarrativeStyle.JOURNALISTIC: "An investigation into {topic} reveals multiple dimensions of understanding.",
+        NarrativeStyle.ACADEMIC: (
+            "This analysis examines {topic} through multiple methodological lenses."
+        ),
+        NarrativeStyle.JOURNALISTIC: (
+            "An investigation into {topic} reveals multiple dimensions of understanding."
+        ),
         NarrativeStyle.CONVERSATIONAL: "Let's explore {topic} from several different angles.",
-        NarrativeStyle.POETIC: "The nature of {topic} unfolds through layers of meaning and perspective.",
+        NarrativeStyle.POETIC: (
+            "The nature of {topic} unfolds through layers of meaning and perspective."
+        ),
         NarrativeStyle.EXECUTIVE: "Key findings on {topic}:",
-        NarrativeStyle.TECHNICAL: "Technical analysis of {topic} across {stage_count} analytical dimensions.",
+        NarrativeStyle.TECHNICAL: (
+            "Technical analysis of {topic} across {stage_count} analytical dimensions."
+        ),
     }
 
     STYLE_TRANSITIONS = {
@@ -371,16 +382,20 @@ class NarrativeSynthesizer:
         config: NarrativeConfig,
     ) -> str:
         """Generate methodology description."""
-        stages_desc = "\n".join(
-            f"- **{r.stage_name}** ({r.role}): {session.workflow.get_stage(i).description if i < len(session.workflow.stages) else ''}"
-            for i, r in enumerate(session.results)
+        stage_lines: list[str] = []
+        for i, result in enumerate(session.results):
+            stage = session.workflow.get_stage(i) if i < len(session.workflow.stages) else None
+            description = stage.description if stage else ""
+            stage_lines.append(f"- **{result.stage_name}** ({result.role}): {description}")
+        stages_desc = "\n".join(stage_lines)
+
+        return (
+            f"This inquiry employed the {session.workflow.name} workflow, comprising "
+            f"{len(session.results)} distinct cognitive stages:\n\n"
+            f"{stages_desc}\n\n"
+            "Each stage builds upon previous insights while bringing its unique "
+            "analytical perspective."
         )
-
-        return f"""This inquiry employed the {session.workflow.name} workflow, comprising {len(session.results)} distinct cognitive stages:
-
-{stages_desc}
-
-Each stage builds upon previous insights while bringing its unique analytical perspective."""
 
     def _section_title_for_stage(self, stage_name: str, style: NarrativeStyle) -> str:
         """Generate section title based on style."""
@@ -459,12 +474,14 @@ suggesting that comprehensive understanding requires engaging with multiple cogn
         ]
 
         for section in sections:
-            parts.extend([
-                f"## {section.title}",
-                "",
-                section.content,
-                "",
-            ])
+            parts.extend(
+                [
+                    f"## {section.title}",
+                    "",
+                    section.content,
+                    "",
+                ]
+            )
 
         return "\n".join(parts)
 

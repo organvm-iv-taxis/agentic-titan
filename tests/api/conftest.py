@@ -50,8 +50,8 @@ def mock_auth_storage():
     storage.delete_user.return_value = True
     storage.list_users.return_value = []
     storage.count_users.return_value = 0
-    storage.hash_password.return_value = "hashed"  # allow-secret
-    storage.verify_password.return_value = True  # allow-secret
+    storage.hash_password = MagicMock(return_value="hashed")  # allow-secret
+    storage.verify_password = MagicMock(return_value=True)  # allow-secret
     return storage
 
 

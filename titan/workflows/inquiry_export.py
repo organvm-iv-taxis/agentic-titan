@@ -10,11 +10,10 @@ The export format matches the style from expand_AI_inquiry.jsx.
 from __future__ import annotations
 
 import re
-from datetime import datetime
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from titan.workflows.inquiry_engine import InquirySession, StageResult
+    from titan.workflows.inquiry_engine import InquirySession
 
 
 def slugify(text: str) -> str:
@@ -29,7 +28,7 @@ def slugify(text: str) -> str:
 
 
 def export_stage_to_markdown(
-    session: "InquirySession",
+    session: InquirySession,
     stage_index: int,
 ) -> str:
     """
@@ -101,7 +100,8 @@ metadata:
 
 ---
 
-*This document was generated as part of an Expansive Inquiry AI Collaboration System. Each stage builds upon previous insights to create a comprehensive exploration of the topic.*
+*This document was generated as part of an Expansive Inquiry AI Collaboration System.
+Each stage builds upon previous insights to create a comprehensive exploration of the topic.*
 
 **Execution Details:**
 - Duration: {result.duration_ms}ms
@@ -118,7 +118,7 @@ metadata:
 
 
 def export_session_to_markdown(
-    session: "InquirySession",
+    session: InquirySession,
     include_toc: bool = True,
 ) -> str:
     """
@@ -133,7 +133,10 @@ def export_session_to_markdown(
     """
     timestamp = session.created_at.isoformat()
     date_formatted = session.created_at.strftime("%B %d, %Y")
-    completed_at = session.completed_at.strftime("%B %d, %Y %H:%M") if session.completed_at else "In Progress"
+    if session.completed_at:
+        completed_at = session.completed_at.strftime("%B %d, %Y %H:%M")
+    else:
+        completed_at = "In Progress"
     topic_slug = slugify(session.topic)
 
     # Calculate totals
@@ -142,7 +145,8 @@ def export_session_to_markdown(
 
     # Build tags from all stages
     stage_tags = [slugify(s.name) for s in session.workflow.stages]
-    tags_yaml = "\n".join(f"  - {tag}" for tag in ["expansive-inquiry", "ai-collaboration", topic_slug] + stage_tags)
+    core_tags = ["expansive-inquiry", "ai-collaboration", topic_slug]
+    tags_yaml = "\n".join(f"  - {tag}" for tag in core_tags + stage_tags)
 
     frontmatter = f"""---
 title: "Collaborative Inquiry: {session.topic}"
@@ -155,7 +159,7 @@ stages_completed: {len(session.results)}
 total_stages: {session.total_stages}
 inquiry_type: "expansive_collaborative"
 created_date: "{timestamp}"
-completed_date: "{session.completed_at.isoformat() if session.completed_at else ''}"
+completed_date: "{session.completed_at.isoformat() if session.completed_at else ""}"
 total_tokens: {total_tokens}
 total_duration_ms: {total_duration_ms}
 tags:
@@ -190,7 +194,9 @@ metadata:
 
 {session.workflow.description}
 
-This inquiry explored **"{session.topic}"** through {session.total_stages} distinct cognitive perspectives, each building upon previous insights to create a comprehensive understanding.
+This inquiry explored **"{session.topic}"** through {session.total_stages} distinct
+cognitive perspectives, each building upon previous insights to create a comprehensive
+understanding.
 
 ---
 
@@ -227,7 +233,8 @@ This inquiry explored **"{session.topic}"** through {session.total_stages} disti
         summary = f"""
 ## Collaborative Inquiry Complete
 
-The system has completed all {session.total_stages} stages of expansive inquiry. Each AI specialist contributed their unique perspective:
+The system has completed all {session.total_stages} stages of expansive inquiry.
+Each AI specialist contributed their unique perspective:
 
 """
         for i, result in enumerate(session.results):
@@ -235,7 +242,8 @@ The system has completed all {session.total_stages} stages of expansive inquiry.
             summary += f"- **{stage.role}**: {stage.description}\n"
 
         summary += f"""
-Notice how the different AI roles built upon each other's insights to reveal dimensions that no single AI could have discovered alone.
+Notice how the different AI roles built upon each other's insights to reveal
+dimensions that no single AI could have discovered alone.
 
 ### Execution Summary
 
@@ -255,7 +263,7 @@ Notice how the different AI roles built upon each other's insights to reveal dim
 
 
 def export_session_to_files(
-    session: "InquirySession",
+    session: InquirySession,
     output_dir: str,
 ) -> list[str]:
     """

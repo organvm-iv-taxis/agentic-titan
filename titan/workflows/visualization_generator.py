@@ -11,7 +11,7 @@ import json
 import logging
 import re
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger("titan.workflows.visualization")
 
 
-class VisualizationType(str, Enum):
+class VisualizationType(StrEnum):
     """Types of visualizations."""
 
     RADAR = "radar"  # Radar/spider chart for multi-dimensional comparison
@@ -35,7 +35,7 @@ class VisualizationType(str, Enum):
     LINE = "line"  # Line chart for trends
 
 
-class VisualizationLibrary(str, Enum):
+class VisualizationLibrary(StrEnum):
     """Supported visualization libraries."""
 
     CHARTJS = "chartjs"
@@ -151,12 +151,12 @@ class VisualizationGenerator:
 
     # Colors for Chart.js visualizations
     CHART_COLORS = [
-        "rgba(54, 162, 235, 0.8)",   # Blue
-        "rgba(255, 99, 132, 0.8)",   # Red
-        "rgba(75, 192, 192, 0.8)",   # Teal
-        "rgba(255, 206, 86, 0.8)",   # Yellow
+        "rgba(54, 162, 235, 0.8)",  # Blue
+        "rgba(255, 99, 132, 0.8)",  # Red
+        "rgba(75, 192, 192, 0.8)",  # Teal
+        "rgba(255, 206, 86, 0.8)",  # Yellow
         "rgba(153, 102, 255, 0.8)",  # Purple
-        "rgba(255, 159, 64, 0.8)",   # Orange
+        "rgba(255, 159, 64, 0.8)",  # Orange
     ]
 
     def __init__(self) -> None:
@@ -221,13 +221,15 @@ class VisualizationGenerator:
         labels = [r.stage_name for r in session.results]
 
         # Generate scores based on content length and other heuristics
-        datasets = [{
-            "label": "Content Depth",
-            "data": [min(1.0, len(r.content) / 2000) for r in session.results],
-            "backgroundColor": "rgba(54, 162, 235, 0.2)",
-            "borderColor": "rgba(54, 162, 235, 1)",
-            "pointBackgroundColor": "rgba(54, 162, 235, 1)",
-        }]
+        datasets = [
+            {
+                "label": "Content Depth",
+                "data": [min(1.0, len(r.content) / 2000) for r in session.results],
+                "backgroundColor": "rgba(54, 162, 235, 0.2)",
+                "borderColor": "rgba(54, 162, 235, 1)",
+                "pointBackgroundColor": "rgba(54, 162, 235, 1)",
+            }
+        ]
 
         return VisualizationSpec(
             viz_type=VisualizationType.RADAR,
@@ -274,10 +276,12 @@ class VisualizationGenerator:
             },
             data={
                 "labels": labels,
-                "datasets": [{
-                    "data": values,
-                    "backgroundColor": self.CHART_COLORS[:len(labels)],
-                }],
+                "datasets": [
+                    {
+                        "data": values,
+                        "backgroundColor": self.CHART_COLORS[: len(labels)],
+                    }
+                ],
             },
         )
 
@@ -304,11 +308,13 @@ class VisualizationGenerator:
             },
             data={
                 "labels": labels,
-                "datasets": [{
-                    "label": "Duration (s)",
-                    "data": durations,
-                    "backgroundColor": self.CHART_COLORS[0],
-                }],
+                "datasets": [
+                    {
+                        "label": "Duration (s)",
+                        "data": durations,
+                        "backgroundColor": self.CHART_COLORS[0],
+                    }
+                ],
             },
         )
 
@@ -337,11 +343,13 @@ class VisualizationGenerator:
                 },
                 data={
                     "labels": [item[:50] for item in list_items[:8]],
-                    "datasets": [{
-                        "label": "Relevance",
-                        "data": list(range(len(list_items[:8]), 0, -1)),
-                        "backgroundColor": self.CHART_COLORS[1],
-                    }],
+                    "datasets": [
+                        {
+                            "label": "Relevance",
+                            "data": list(range(len(list_items[:8]), 0, -1)),
+                            "backgroundColor": self.CHART_COLORS[1],
+                        }
+                    ],
                 },
                 metadata={"extracted_from": stage_name},
             )
@@ -351,7 +359,7 @@ class VisualizationGenerator:
         percentages = re.findall(percent_pattern, content)
 
         if len(percentages) >= 2:
-            labels = [f"Item {i+1}" for i in range(len(percentages[:6]))]
+            labels = [f"Item {i + 1}" for i in range(len(percentages[:6]))]
             values = [float(p) for p in percentages[:6]]
 
             return VisualizationSpec(
@@ -362,10 +370,12 @@ class VisualizationGenerator:
                 config={},
                 data={
                     "labels": labels,
-                    "datasets": [{
-                        "data": values,
-                        "backgroundColor": self.CHART_COLORS[:len(values)],
-                    }],
+                    "datasets": [
+                        {
+                            "data": values,
+                            "backgroundColor": self.CHART_COLORS[: len(values)],
+                        }
+                    ],
                 },
                 metadata={"extracted_from": stage_name},
             )
@@ -378,37 +388,45 @@ class VisualizationGenerator:
         links = []
 
         # Add topic as central node
-        nodes.append({
-            "id": "topic",
-            "label": session.topic[:30],
-            "group": "topic",
-            "size": 30,
-        })
+        nodes.append(
+            {
+                "id": "topic",
+                "label": session.topic[:30],
+                "group": "topic",
+                "size": 30,
+            }
+        )
 
         # Add stages as nodes
         for i, result in enumerate(session.results):
             node_id = f"stage_{i}"
-            nodes.append({
-                "id": node_id,
-                "label": result.stage_name,
-                "group": "stage",
-                "size": 20,
-            })
+            nodes.append(
+                {
+                    "id": node_id,
+                    "label": result.stage_name,
+                    "group": "stage",
+                    "size": 20,
+                }
+            )
 
             # Link to topic
-            links.append({
-                "source": "topic",
-                "target": node_id,
-                "value": 2,
-            })
+            links.append(
+                {
+                    "source": "topic",
+                    "target": node_id,
+                    "value": 2,
+                }
+            )
 
             # Link to previous stage
             if i > 0:
-                links.append({
-                    "source": f"stage_{i-1}",
-                    "target": node_id,
-                    "value": 1,
-                })
+                links.append(
+                    {
+                        "source": f"stage_{i - 1}",
+                        "target": node_id,
+                        "value": 1,
+                    }
+                )
 
         return VisualizationSpec(
             viz_type=VisualizationType.FORCE,
@@ -467,11 +485,13 @@ class VisualizationGenerator:
                             config={},
                             data={
                                 "labels": data.get("labels", []),
-                                "datasets": [{
-                                    "label": "Values",
-                                    "data": data.get("values", data.get("data", [])),
-                                    "backgroundColor": self.CHART_COLORS[0],
-                                }],
+                                "datasets": [
+                                    {
+                                        "label": "Values",
+                                        "data": data.get("values", data.get("data", [])),
+                                        "backgroundColor": self.CHART_COLORS[0],
+                                    }
+                                ],
                             },
                             metadata={"extracted_from": source_stage, "source": "json_block"},
                         )

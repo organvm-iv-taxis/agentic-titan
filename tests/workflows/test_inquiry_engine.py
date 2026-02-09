@@ -12,6 +12,10 @@ Tests cover:
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
+from pathlib import Path
+from types import SimpleNamespace
 import pytest
 from datetime import datetime
 
@@ -275,6 +279,34 @@ class TestInquiryPrompts:
 
 
 # =============================================================================
+# Package Import Surface Tests
+# =============================================================================
+
+
+class TestWorkflowPackageImports:
+    """Tests for workflow package import behavior."""
+
+    def test_workflows_package_import_is_lightweight(self):
+        """Importing titan.workflows should not import inquiry_engine eagerly."""
+        project_root = Path(__file__).resolve().parents[2]
+        script = (
+            "import sys; "
+            "import titan.workflows; "
+            "print('titan.workflows.inquiry_engine' in sys.modules)"
+        )
+
+        proc = subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=project_root,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        assert proc.stdout.strip() == "False"
+
+
+# =============================================================================
 # Inquiry Engine Tests
 # =============================================================================
 
@@ -417,6 +449,37 @@ class TestInquiryEngine:
 
         assert session2 in pending
         assert session1 in running
+
+    def test_constructor_uses_runtime_config_when_defaults_omitted(self, monkeypatch):
+        """Constructor should resolve defaults from config at runtime."""
+        fake_config = SimpleNamespace(
+            llm=SimpleNamespace(default_model="config-model"),
+            max_context_tokens=1234,
+        )
+        monkeypatch.setattr(
+            "titan.workflows.inquiry_engine.get_config",
+            lambda: fake_config,
+        )
+
+        engine = InquiryEngine(default_model=None, max_context_tokens=None)
+
+        assert engine._default_model == "config-model"
+        assert engine._max_context_tokens == 1234
+
+    def test_constructor_with_explicit_values_skips_config_lookup(self, monkeypatch):
+        """Explicit constructor values should bypass config lookup."""
+        def _boom():
+            raise AssertionError("get_config should not be called")
+
+        monkeypatch.setattr("titan.workflows.inquiry_engine.get_config", _boom)
+
+        engine = InquiryEngine(
+            default_model="explicit-model",
+            max_context_tokens=777,
+        )
+
+        assert engine._default_model == "explicit-model"
+        assert engine._max_context_tokens == 777
 
 
 # =============================================================================

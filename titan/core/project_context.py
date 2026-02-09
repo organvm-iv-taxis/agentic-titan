@@ -33,11 +33,9 @@ Reference: vendor/cli/codex-ai AGENTS.md pattern
 from __future__ import annotations
 
 import logging
-import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
 
 logger = logging.getLogger("titan.core.context")
 
@@ -214,24 +212,21 @@ def parse_markdown_sections(content: str) -> list[ProjectSection]:
     heading_pattern = re.compile(r"^(#{1,6})\s+(.+)$", re.MULTILINE)
 
     sections: list[ProjectSection] = []
-    current_content_start = 0
     matches = list(heading_pattern.finditer(content))
 
     for i, match in enumerate(matches):
         # Get content before this heading (for root content)
         if i == 0 and match.start() > 0:
-            root_content = content[:match.start()].strip()
+            root_content = content[: match.start()].strip()
             if root_content:
-                sections.append(
-                    ProjectSection(name="_root", level=0, content=root_content)
-                )
+                sections.append(ProjectSection(name="_root", level=0, content=root_content))
 
         # Determine content end (start of next heading or end of content)
         content_end = matches[i + 1].start() if i + 1 < len(matches) else len(content)
 
         level = len(match.group(1))
         name = match.group(2).strip()
-        section_content = content[match.end():content_end].strip()
+        section_content = content[match.end() : content_end].strip()
 
         section = ProjectSection(name=name, level=level, content=section_content)
         sections.append(section)
@@ -370,9 +365,7 @@ def load_file_content(path: Path) -> str | None:
     try:
         size = path.stat().st_size
         if size > MAX_CONTEXT_FILE_SIZE:
-            logger.warning(
-                f"Context file too large ({size} bytes): {path}"
-            )
+            logger.warning(f"Context file too large ({size} bytes): {path}")
             return None
 
         return path.read_text(encoding="utf-8")

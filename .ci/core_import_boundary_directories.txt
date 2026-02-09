@@ -1,0 +1,5 @@
+# Directories that require full manifest coverage.
+# Additional core directories can be added incrementally as they are lint-cleaned.
+titan/api
+titan/core
+titan/workflows

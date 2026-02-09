@@ -154,7 +154,7 @@ class TestUserManagement:
             storage = AsyncMock()
             storage.get_user_by_username.return_value = None
             storage.get_user_by_email.return_value = None
-            storage.hash_password.return_value = "hashed"  # allow-secret
+            storage.hash_password = MagicMock(return_value="hashed")  # allow-secret
             storage.create_user.return_value = True
             mock_storage.return_value = storage
 

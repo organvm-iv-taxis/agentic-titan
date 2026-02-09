@@ -8,9 +8,10 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Callable
+from collections.abc import Callable
+from typing import Any, Protocol, TypeAlias, TypeVar, cast
 
-from fastapi import Request, Response
+from fastapi import Request
 from starlette.responses import JSONResponse
 
 logger = logging.getLogger("titan.api.rate_limit")
@@ -20,13 +21,31 @@ REDIS_URL = os.getenv("TITAN_REDIS_URL", "redis://localhost:6379")
 DEFAULT_RATE_LIMIT = os.getenv("TITAN_DEFAULT_RATE_LIMIT", "100/minute")
 
 
-def _get_slowapi():
+F = TypeVar("F", bound=Callable[..., Any])
+
+
+class LimiterLike(Protocol):
+    """Subset of slowapi Limiter API used in this module."""
+
+    def limit(self, value: str) -> Callable[[F], F]: ...
+
+
+SlowApiImportTuple: TypeAlias = tuple[
+    type[Any],  # Limiter class
+    Callable[[Request], str],  # get_remote_address
+    type[Exception],  # RateLimitExceeded
+    type[Any],  # SlowAPIMiddleware
+]
+
+
+def _get_slowapi() -> SlowApiImportTuple:
     """Lazy import of slowapi."""
     try:
         from slowapi import Limiter
-        from slowapi.util import get_remote_address
         from slowapi.errors import RateLimitExceeded
         from slowapi.middleware import SlowAPIMiddleware
+        from slowapi.util import get_remote_address
+
         return Limiter, get_remote_address, RateLimitExceeded, SlowAPIMiddleware
     except ImportError:
         raise ImportError(
@@ -64,21 +83,24 @@ def get_user_identifier(request: Request) -> str:
     return f"ip:{get_remote_address(request)}"
 
 
-def create_limiter() -> "Limiter":
+def create_limiter() -> LimiterLike:
     """
     Create and configure the rate limiter.
 
     Returns:
         Configured Limiter instance
     """
-    Limiter, _, _, _ = _get_slowapi()
+    limiter_cls, _, _, _ = _get_slowapi()
 
-    return Limiter(
-        key_func=get_user_identifier,
-        storage_uri=REDIS_URL,
-        default_limits=[DEFAULT_RATE_LIMIT],
-        strategy="fixed-window",  # Options: fixed-window, moving-window
-        headers_enabled=True,  # Include X-RateLimit-* headers
+    return cast(
+        LimiterLike,
+        limiter_cls(
+            key_func=get_user_identifier,
+            storage_uri=REDIS_URL,
+            default_limits=[DEFAULT_RATE_LIMIT],
+            strategy="fixed-window",  # Options: fixed-window, moving-window
+            headers_enabled=True,  # Include X-RateLimit-* headers
+        ),
     )
 
 
@@ -93,7 +115,7 @@ def rate_limit_exceeded_handler(request: Request, exc: Exception) -> JSONRespons
     Returns:
         JSON response with rate limit error
     """
-    _, _, RateLimitExceeded, _ = _get_slowapi()
+    _get_slowapi()
 
     # Extract retry-after from exception if available
     retry_after = 60  # Default
@@ -120,20 +142,16 @@ RATE_LIMITS = {
     "auth_login": "5/minute",
     "auth_refresh": "10/minute",
     "auth_api_keys": "10/minute",
-
     # Batch processing (expensive operations)
     "batch_submit": "10/minute",
     "batch_start": "20/minute",
     "batch_export": "5/minute",
-
     # Inquiry endpoints
     "inquiry_start": "20/minute",
     "inquiry_run_all": "10/minute",
-
     # Admin endpoints (more permissive for admins)
     "admin_users": "50/minute",
     "admin_config": "30/minute",
-
     # Default for unspecified endpoints
     "default": "100/minute",
 }
@@ -153,10 +171,10 @@ def get_rate_limit(endpoint_key: str) -> str:
 
 
 # Global limiter instance (lazy initialized)
-_limiter: "Limiter" | None = None
+_limiter: LimiterLike | None = None
 
 
-def get_limiter() -> "Limiter":
+def get_limiter() -> LimiterLike | None:
     """Get or create the global limiter instance."""
     global _limiter
     if _limiter is None:
@@ -169,7 +187,7 @@ def get_limiter() -> "Limiter":
     return _limiter
 
 
-def setup_rate_limiting(app) -> None:
+def setup_rate_limiting(app: Any) -> None:
     """
     Set up rate limiting for a FastAPI application.
 
@@ -177,7 +195,7 @@ def setup_rate_limiting(app) -> None:
         app: FastAPI application instance
     """
     try:
-        Limiter, _, RateLimitExceeded, SlowAPIMiddleware = _get_slowapi()
+        _, _, rate_limit_exceeded_cls, _ = _get_slowapi()
 
         limiter = get_limiter()
         if limiter is None:
@@ -187,7 +205,7 @@ def setup_rate_limiting(app) -> None:
         app.state.limiter = limiter
 
         # Add rate limit exceeded handler
-        app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+        app.add_exception_handler(rate_limit_exceeded_cls, rate_limit_exceeded_handler)
 
         logger.info("Rate limiting configured")
 
@@ -195,7 +213,7 @@ def setup_rate_limiting(app) -> None:
         logger.warning("slowapi not installed, rate limiting disabled")
 
 
-def limit(rate: str) -> Callable:
+def limit(rate: str) -> Callable[[F], F]:
     """
     Decorator factory for rate limiting individual endpoints.
 
@@ -206,7 +224,7 @@ def limit(rate: str) -> Callable:
         Decorator function
 
     Usage:
-        @router.post("/submit")
+        @typed_post(router, "/submit")
         @limit("10/minute")
         async def submit_batch(...):
             ...
@@ -214,24 +232,25 @@ def limit(rate: str) -> Callable:
     limiter = get_limiter()
     if limiter is None:
         # Return no-op decorator if limiter not available
-        def noop_decorator(func):
+        def noop_decorator(func: F) -> F:
             return func
+
         return noop_decorator
 
     return limiter.limit(rate)
 
 
 # Convenience decorators for common rate limits
-def auth_limit(func: Callable) -> Callable:
+def auth_limit(func: F) -> F:
     """Apply authentication endpoint rate limit."""
     return limit(RATE_LIMITS["auth_login"])(func)
 
 
-def batch_limit(func: Callable) -> Callable:
+def batch_limit(func: F) -> F:
     """Apply batch endpoint rate limit."""
     return limit(RATE_LIMITS["batch_submit"])(func)
 
 
-def inquiry_limit(func: Callable) -> Callable:
+def inquiry_limit(func: F) -> F:
     """Apply inquiry endpoint rate limit."""
     return limit(RATE_LIMITS["inquiry_start"])(func)

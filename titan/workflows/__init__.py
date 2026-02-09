@@ -1,74 +1,56 @@
 """
-Titan Workflows - Multi-Perspective Collaborative Inquiry System
+Titan Workflows - Multi-Perspective Collaborative Inquiry System.
 
-This module provides a configurable workflow engine for multi-AI collaborative
-inquiry. It uses specialized personas that each approach topics from different
-cognitive angles, with multi-model routing for optimal results.
-
-Components:
-- inquiry_config: Workflow and stage configuration dataclasses
-- inquiry_engine: Core workflow execution engine
-- inquiry_prompts: Stage-specific prompt templates
-- cognitive_router: Multi-model routing based on cognitive task type
-- inquiry_export: Markdown export utilities
-
-Key Classes:
-- InquiryWorkflow: Defines a sequence of inquiry stages
-- InquiryEngine: Executes workflows with multi-model routing
-- CognitiveRouter: Selects optimal models for cognitive tasks
-
-Example:
-    from titan.workflows import InquiryEngine, EXPANSIVE_INQUIRY_WORKFLOW
-
-    engine = InquiryEngine()
-    session = await engine.start_inquiry(
-        topic="The nature of consciousness",
-        workflow=EXPANSIVE_INQUIRY_WORKFLOW,
-    )
-    await engine.run_full_workflow(session)
+This package intentionally uses lazy exports so importing ``titan.workflows``
+does not force heavy runtime configuration imports.
 """
 
-from titan.workflows.inquiry_config import (
-    InquiryStage,
-    InquiryWorkflow,
-    EXPANSIVE_INQUIRY_WORKFLOW,
-    DEFAULT_WORKFLOWS,
-)
-from titan.workflows.inquiry_engine import (
-    StageResult,
-    InquirySession,
-    InquiryEngine,
-    InquiryStatus,
-)
-from titan.workflows.cognitive_router import (
-    CognitiveTaskType,
-    CognitiveRouter,
-    COGNITIVE_MODEL_MAP,
-)
-from titan.workflows.inquiry_export import (
-    export_stage_to_markdown,
-    export_session_to_markdown,
-)
-from titan.workflows.inquiry_prompts import STAGE_PROMPTS
+from __future__ import annotations
 
-__all__ = [
-    # Config
-    "InquiryStage",
-    "InquiryWorkflow",
-    "EXPANSIVE_INQUIRY_WORKFLOW",
-    "DEFAULT_WORKFLOWS",
-    # Engine
-    "StageResult",
-    "InquirySession",
-    "InquiryEngine",
-    "InquiryStatus",
-    # Router
-    "CognitiveTaskType",
-    "CognitiveRouter",
-    "COGNITIVE_MODEL_MAP",
-    # Export
-    "export_stage_to_markdown",
-    "export_session_to_markdown",
-    # Prompts
-    "STAGE_PROMPTS",
-]
+from importlib import import_module
+from typing import Any
+
+_EXPORTS: dict[str, tuple[str, str]] = {
+    "InquiryStage": ("titan.workflows.inquiry_config", "InquiryStage"),
+    "InquiryWorkflow": ("titan.workflows.inquiry_config", "InquiryWorkflow"),
+    "EXPANSIVE_INQUIRY_WORKFLOW": (
+        "titan.workflows.inquiry_config",
+        "EXPANSIVE_INQUIRY_WORKFLOW",
+    ),
+    "DEFAULT_WORKFLOWS": ("titan.workflows.inquiry_config", "DEFAULT_WORKFLOWS"),
+    "StageResult": ("titan.workflows.inquiry_engine", "StageResult"),
+    "InquirySession": ("titan.workflows.inquiry_engine", "InquirySession"),
+    "InquiryEngine": ("titan.workflows.inquiry_engine", "InquiryEngine"),
+    "InquiryStatus": ("titan.workflows.inquiry_engine", "InquiryStatus"),
+    "CognitiveTaskType": ("titan.workflows.cognitive_router", "CognitiveTaskType"),
+    "CognitiveRouter": ("titan.workflows.cognitive_router", "CognitiveRouter"),
+    "COGNITIVE_MODEL_MAP": ("titan.workflows.cognitive_router", "COGNITIVE_MODEL_MAP"),
+    "export_stage_to_markdown": (
+        "titan.workflows.inquiry_export",
+        "export_stage_to_markdown",
+    ),
+    "export_session_to_markdown": (
+        "titan.workflows.inquiry_export",
+        "export_session_to_markdown",
+    ),
+    "STAGE_PROMPTS": ("titan.workflows.inquiry_prompts", "STAGE_PROMPTS"),
+}
+
+__all__ = list(_EXPORTS.keys())
+
+
+def __getattr__(name: str) -> Any:
+    """Resolve package exports lazily to keep import surface lightweight."""
+    if name not in _EXPORTS:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+    module_name, attr_name = _EXPORTS[name]
+    module = import_module(module_name)
+    value = getattr(module, attr_name)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    """Expose lazy exports in interactive environments."""
+    return sorted(set(globals()) | set(__all__))

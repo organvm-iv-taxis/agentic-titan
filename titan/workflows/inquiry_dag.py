@@ -12,16 +12,16 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from titan.workflows.inquiry_config import InquiryWorkflow, InquiryStage
+    from titan.workflows.inquiry_config import InquiryWorkflow
 
 logger = logging.getLogger("titan.workflows.inquiry_dag")
 
 
-class ExecutionMode(str, Enum):
+class ExecutionMode(StrEnum):
     """Execution modes for inquiry workflow."""
 
     SEQUENTIAL = "sequential"  # Execute one stage at a time in order
@@ -70,7 +70,7 @@ class InquiryDependencyGraph:
     _adjacency: dict[int, list[int]]  # stage_index -> dependent stage indices
 
     @classmethod
-    def from_workflow(cls, workflow: "InquiryWorkflow") -> "InquiryDependencyGraph":
+    def from_workflow(cls, workflow: InquiryWorkflow) -> InquiryDependencyGraph:
         """
         Build dependency graph from an InquiryWorkflow.
 
@@ -87,10 +87,7 @@ class InquiryDependencyGraph:
         adjacency: dict[int, list[int]] = {}
 
         # Check if any stage has explicit dependencies
-        has_explicit_deps = any(
-            stage.dependencies is not None
-            for stage in workflow.stages
-        )
+        has_explicit_deps = any(stage.dependencies is not None for stage in workflow.stages)
 
         for idx, stage in enumerate(workflow.stages):
             # Determine dependencies
@@ -129,7 +126,7 @@ class InquiryDependencyGraph:
         return graph
 
     @classmethod
-    def _create_sequential_graph(cls, workflow: "InquiryWorkflow") -> "InquiryDependencyGraph":
+    def _create_sequential_graph(cls, workflow: InquiryWorkflow) -> InquiryDependencyGraph:
         """Create a simple sequential dependency graph."""
         nodes: dict[int, StageNode] = {}
         adjacency: dict[int, list[int]] = {}
@@ -148,21 +145,21 @@ class InquiryDependencyGraph:
 
     def _has_cycle(self) -> bool:
         """Check if the graph has a cycle using DFS."""
-        WHITE, GRAY, BLACK = 0, 1, 2
-        color = {idx: WHITE for idx in self.nodes}
+        white, gray, black = 0, 1, 2
+        color = {idx: white for idx in self.nodes}
 
         def dfs(node_idx: int) -> bool:
-            color[node_idx] = GRAY
+            color[node_idx] = gray
             for dep_idx in self._adjacency.get(node_idx, []):
-                if color[dep_idx] == GRAY:
+                if color[dep_idx] == gray:
                     return True  # Back edge found - cycle
-                if color[dep_idx] == WHITE and dfs(dep_idx):
+                if color[dep_idx] == white and dfs(dep_idx):
                     return True
-            color[node_idx] = BLACK
+            color[node_idx] = black
             return False
 
         for node_idx in self.nodes:
-            if color[node_idx] == WHITE:
+            if color[node_idx] == white:
                 if dfs(node_idx):
                     return True
         return False
@@ -239,7 +236,6 @@ class InquiryDependencyGraph:
             return []
 
         node = self.nodes[stage_idx]
-        context_stages = list(node.dependencies)
 
         # Also include transitive dependencies for complete context
         visited: set[int] = set()
@@ -295,7 +291,7 @@ class InquiryDependencyGraph:
         return len(self.nodes)
 
 
-def validate_workflow_dependencies(workflow: "InquiryWorkflow") -> list[str]:
+def validate_workflow_dependencies(workflow: InquiryWorkflow) -> list[str]:
     """
     Validate stage dependencies in a workflow.
 
@@ -322,9 +318,7 @@ def validate_workflow_dependencies(workflow: "InquiryWorkflow") -> list[str]:
                     f"Stage {idx} ({stage.name}) depends on non-existent stage: {dep_idx}"
                 )
             elif dep_idx == idx:
-                errors.append(
-                    f"Stage {idx} ({stage.name}) cannot depend on itself"
-                )
+                errors.append(f"Stage {idx} ({stage.name}) cannot depend on itself")
             elif dep_idx > idx:
                 # Forward reference - check if it creates a cycle
                 logger.warning(
