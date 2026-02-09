@@ -17,6 +17,7 @@ titan/api/rate_limit.py
 titan/api/typing_helpers.py
 titan/auth/jwt.py
 titan/auth/storage.py
+titan/batch/artifact_store.py
 titan/workflows/__init__.py
 titan/workflows/cognitive_router.py
 titan/workflows/inquiry_config.py

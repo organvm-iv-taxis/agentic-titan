@@ -13,10 +13,9 @@ import logging
 import os
 import zipfile
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from titan.batch.models import SessionArtifact
@@ -453,7 +452,7 @@ class S3ArtifactStore(ArtifactStore):
 
         try:
             response = self._client.get_object(Bucket=self.bucket, Key=key)
-            return response["Body"].read()
+            return cast(bytes, response["Body"].read())
         except self._client.exceptions.NoSuchKey:
             raise FileNotFoundError(f"Artifact not found: {artifact_uri}")
 
