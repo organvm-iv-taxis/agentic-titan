@@ -12,6 +12,7 @@ from typing import Any
 
 from fastapi import APIRouter
 
+from titan.api.typing_helpers import typed_get, typed_post
 from titan.workflows.cognitive_router import (
     COGNITIVE_MODEL_MAP,
     MODEL_RANKINGS,
@@ -24,7 +25,7 @@ logger = logging.getLogger("titan.api.models")
 models_router = APIRouter(prefix="/models", tags=["models"])
 
 
-@models_router.get("/signatures")  # type: ignore[untyped-decorator]
+@typed_get(models_router, "/signatures")
 async def get_model_signatures() -> dict[str, Any]:
     """
     Get cognitive task signatures for all models.
@@ -44,7 +45,7 @@ async def get_model_signatures() -> dict[str, Any]:
     }
 
 
-@models_router.get("/signatures/{model_id}")  # type: ignore[untyped-decorator]
+@typed_get(models_router, "/signatures/{model_id}")
 async def get_model_signature(model_id: str) -> dict[str, Any]:
     """
     Get cognitive signature for a specific model.
@@ -71,7 +72,7 @@ async def get_model_signature(model_id: str) -> dict[str, Any]:
     }
 
 
-@models_router.get("/list")  # type: ignore[untyped-decorator]
+@typed_get(models_router, "/list")
 async def list_models() -> dict[str, Any]:
     """
     List all available models with their primary strengths.
@@ -104,7 +105,7 @@ async def list_models() -> dict[str, Any]:
     }
 
 
-@models_router.get("/preferences")  # type: ignore[untyped-decorator]
+@typed_get(models_router, "/preferences")
 async def get_task_preferences() -> dict[str, Any]:
     """
     Get model preferences per cognitive task type.
@@ -122,7 +123,7 @@ async def get_task_preferences() -> dict[str, Any]:
     return preferences
 
 
-@models_router.get("/compare")  # type: ignore[untyped-decorator]
+@typed_get(models_router, "/compare")
 async def compare_models(
     model_a: str,
     model_b: str,
@@ -175,7 +176,7 @@ async def compare_models(
     }
 
 
-@models_router.post("/route")  # type: ignore[untyped-decorator]
+@typed_post(models_router, "/route")
 async def route_for_task(
     task_type: str,
     preferred_model: str | None = None,

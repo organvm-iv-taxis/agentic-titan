@@ -20,6 +20,7 @@ from typing import Any
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 
+from titan.api.typing_helpers import typed_get, typed_websocket
 from titan.workflows.inquiry_engine import (
     InquiryEngine,
     InquiryStatus,
@@ -108,7 +109,7 @@ class InquiryWebSocketManager:
 ws_manager = InquiryWebSocketManager()
 
 
-@ws_router.websocket("/api/inquiry/{session_id}/stream")  # type: ignore[untyped-decorator]
+@typed_websocket(ws_router, "/api/inquiry/{session_id}/stream")
 async def inquiry_websocket(
     websocket: WebSocket,
     session_id: str,
@@ -281,7 +282,7 @@ async def handle_start_action(
 
 
 # Alternative endpoint using Server-Sent Events (SSE) for simpler clients
-@ws_router.get("/api/inquiry/{session_id}/events")  # type: ignore[untyped-decorator]
+@typed_get(ws_router, "/api/inquiry/{session_id}/events")
 async def inquiry_sse(
     session_id: str,
 ) -> StreamingResponse | dict[str, str]:

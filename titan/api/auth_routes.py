@@ -22,8 +22,8 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel
 
+from titan.api.typing_helpers import BaseModel, typed_delete, typed_get, typed_post
 from titan.auth.middleware import (
     get_current_user,
 )
@@ -43,7 +43,7 @@ auth_router = APIRouter(prefix="/auth", tags=["auth"])
 # =============================================================================
 
 
-class LoginResponse(BaseModel):  # type: ignore[misc]
+class LoginResponse(BaseModel):
     """Response for successful login."""
 
     access_token: str
@@ -53,13 +53,13 @@ class LoginResponse(BaseModel):  # type: ignore[misc]
     user: dict[str, Any]
 
 
-class RefreshRequest(BaseModel):  # type: ignore[misc]
+class RefreshRequest(BaseModel):
     """Request to refresh access token."""
 
     refresh_token: str
 
 
-class RefreshResponse(BaseModel):  # type: ignore[misc]
+class RefreshResponse(BaseModel):
     """Response for token refresh."""
 
     access_token: str
@@ -67,7 +67,7 @@ class RefreshResponse(BaseModel):  # type: ignore[misc]
     expires_in: int
 
 
-class APIKeyResponse(BaseModel):  # type: ignore[misc]
+class APIKeyResponse(BaseModel):
     """Response for API key creation (includes the key only once)."""
 
     id: str
@@ -79,7 +79,7 @@ class APIKeyResponse(BaseModel):  # type: ignore[misc]
     created_at: str
 
 
-class APIKeyListResponse(BaseModel):  # type: ignore[misc]
+class APIKeyListResponse(BaseModel):
     """Response for API key listing (no full key)."""
 
     id: str
@@ -92,7 +92,7 @@ class APIKeyListResponse(BaseModel):  # type: ignore[misc]
     last_used_at: str | None
 
 
-class UserResponse(BaseModel):  # type: ignore[misc]
+class UserResponse(BaseModel):
     """Response for user info."""
 
     id: str
@@ -109,7 +109,7 @@ class UserResponse(BaseModel):  # type: ignore[misc]
 # =============================================================================
 
 
-@auth_router.post("/login", response_model=LoginResponse)  # type: ignore[untyped-decorator]
+@typed_post(auth_router, "/login", response_model=LoginResponse)
 async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
 ) -> LoginResponse:
@@ -175,7 +175,7 @@ async def login(
     )
 
 
-@auth_router.post("/refresh", response_model=RefreshResponse)  # type: ignore[untyped-decorator]
+@typed_post(auth_router, "/refresh", response_model=RefreshResponse)
 async def refresh_token(request: RefreshRequest) -> RefreshResponse:
     """
     Refresh an access token using a refresh token.
@@ -198,7 +198,7 @@ async def refresh_token(request: RefreshRequest) -> RefreshResponse:
     )
 
 
-@auth_router.post("/logout")  # type: ignore[untyped-decorator]
+@typed_post(auth_router, "/logout")
 async def logout(user: User = Depends(get_current_user)) -> dict[str, str]:
     """
     Logout the current user.
@@ -210,7 +210,7 @@ async def logout(user: User = Depends(get_current_user)) -> dict[str, str]:
     return {"message": "Logged out successfully"}
 
 
-@auth_router.get("/me", response_model=UserResponse)  # type: ignore[untyped-decorator]
+@typed_get(auth_router, "/me", response_model=UserResponse)
 async def get_me(user: User = Depends(get_current_user)) -> UserResponse:
     """
     Get the current authenticated user's information.
@@ -226,7 +226,7 @@ async def get_me(user: User = Depends(get_current_user)) -> UserResponse:
     )
 
 
-@auth_router.post("/api-keys", response_model=APIKeyResponse)  # type: ignore[untyped-decorator]
+@typed_post(auth_router, "/api-keys", response_model=APIKeyResponse)
 async def create_api_key(
     request: APIKeyCreate,
     user: User = Depends(get_current_user),
@@ -276,9 +276,7 @@ async def create_api_key(
     )
 
 
-@auth_router.get(  # type: ignore[untyped-decorator]
-    "/api-keys", response_model=list[APIKeyListResponse]
-)
+@typed_get(auth_router, "/api-keys", response_model=list[APIKeyListResponse])
 async def list_api_keys(
     user: User = Depends(get_current_user),
     include_inactive: bool = False,
@@ -312,7 +310,7 @@ async def list_api_keys(
     ]
 
 
-@auth_router.delete("/api-keys/{key_id}")  # type: ignore[untyped-decorator]
+@typed_delete(auth_router, "/api-keys/{key_id}")
 async def revoke_api_key(
     key_id: str,
     user: User = Depends(get_current_user),

@@ -19,8 +19,8 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
-from pydantic import BaseModel, Field
 
+from titan.api.typing_helpers import BaseModel, Field, typed_get, typed_post
 from titan.workflows.inquiry_config import (
     DEFAULT_WORKFLOWS,
     get_workflow,
@@ -45,7 +45,7 @@ inquiry_router = APIRouter(prefix="/inquiry", tags=["inquiry"])
 # =============================================================================
 
 
-class StartInquiryRequest(BaseModel):  # type: ignore[misc]
+class StartInquiryRequest(BaseModel):
     """Request to start a new inquiry session."""
 
     topic: str = Field(..., description="The topic to explore", min_length=1)
@@ -59,7 +59,7 @@ class StartInquiryRequest(BaseModel):  # type: ignore[misc]
     )
 
 
-class StartInquiryResponse(BaseModel):  # type: ignore[misc]
+class StartInquiryResponse(BaseModel):
     """Response after starting an inquiry."""
 
     session_id: str
@@ -69,7 +69,7 @@ class StartInquiryResponse(BaseModel):  # type: ignore[misc]
     status: str
 
 
-class SessionResponse(BaseModel):  # type: ignore[misc]
+class SessionResponse(BaseModel):
     """Full session details response."""
 
     id: str
@@ -86,7 +86,7 @@ class SessionResponse(BaseModel):  # type: ignore[misc]
     error: str | None
 
 
-class StageResultResponse(BaseModel):  # type: ignore[misc]
+class StageResultResponse(BaseModel):
     """Response for a single stage result."""
 
     stage_name: str
@@ -100,7 +100,7 @@ class StageResultResponse(BaseModel):  # type: ignore[misc]
     error: str | None
 
 
-class WorkflowResponse(BaseModel):  # type: ignore[misc]
+class WorkflowResponse(BaseModel):
     """Response describing a workflow."""
 
     name: str
@@ -109,7 +109,7 @@ class WorkflowResponse(BaseModel):  # type: ignore[misc]
     stage_count: int
 
 
-class ExportResponse(BaseModel):  # type: ignore[misc]
+class ExportResponse(BaseModel):
     """Response with exported markdown content."""
 
     markdown: str
@@ -121,7 +121,7 @@ class ExportResponse(BaseModel):  # type: ignore[misc]
 # =============================================================================
 
 
-@inquiry_router.post("/start", response_model=StartInquiryResponse)  # type: ignore[untyped-decorator]
+@typed_post(inquiry_router, "/start", response_model=StartInquiryResponse)
 async def start_inquiry(
     request: StartInquiryRequest,
     background_tasks: BackgroundTasks,
@@ -161,7 +161,7 @@ async def start_inquiry(
     )
 
 
-@inquiry_router.get("/{session_id}", response_model=SessionResponse)  # type: ignore[untyped-decorator]
+@typed_get(inquiry_router, "/{session_id}", response_model=SessionResponse)
 async def get_session(session_id: str) -> SessionResponse:
     """
     Get the current status and results of an inquiry session.
@@ -191,9 +191,7 @@ async def get_session(session_id: str) -> SessionResponse:
     )
 
 
-@inquiry_router.post(  # type: ignore[untyped-decorator]
-    "/{session_id}/run-stage", response_model=StageResultResponse
-)
+@typed_post(inquiry_router, "/{session_id}/run-stage", response_model=StageResultResponse)
 async def run_stage(
     session_id: str,
     stage_index: int | None = None,
@@ -251,9 +249,7 @@ async def run_stage(
     )
 
 
-@inquiry_router.post(  # type: ignore[untyped-decorator]
-    "/{session_id}/run-all", response_model=SessionResponse
-)
+@typed_post(inquiry_router, "/{session_id}/run-all", response_model=SessionResponse)
 async def run_all_stages(session_id: str) -> SessionResponse:
     """
     Run all remaining stages of the inquiry.
@@ -297,7 +293,7 @@ async def run_all_stages(session_id: str) -> SessionResponse:
     )
 
 
-@inquiry_router.post("/{session_id}/cancel")  # type: ignore[untyped-decorator]
+@typed_post(inquiry_router, "/{session_id}/cancel")
 async def cancel_session(session_id: str) -> dict[str, Any]:
     """
     Cancel a running inquiry session.
@@ -321,9 +317,7 @@ async def cancel_session(session_id: str) -> dict[str, Any]:
     return {"status": "cancelled", "session_id": session_id}
 
 
-@inquiry_router.get(  # type: ignore[untyped-decorator]
-    "/{session_id}/export", response_model=ExportResponse
-)
+@typed_get(inquiry_router, "/{session_id}/export", response_model=ExportResponse)
 async def export_session(
     session_id: str,
     stage_index: int | None = None,
@@ -364,9 +358,7 @@ async def export_session(
     return ExportResponse(markdown=markdown, filename=filename)
 
 
-@inquiry_router.get(  # type: ignore[untyped-decorator]
-    "/workflows", response_model=list[WorkflowResponse]
-)
+@typed_get(inquiry_router, "/workflows", response_model=list[WorkflowResponse])
 async def list_available_workflows() -> list[WorkflowResponse]:
     """
     List all available inquiry workflows.
@@ -382,7 +374,7 @@ async def list_available_workflows() -> list[WorkflowResponse]:
     ]
 
 
-@inquiry_router.get("/sessions")  # type: ignore[untyped-decorator]
+@typed_get(inquiry_router, "/sessions")
 async def list_sessions(
     status: str | None = None,
 ) -> list[dict[str, Any]]:

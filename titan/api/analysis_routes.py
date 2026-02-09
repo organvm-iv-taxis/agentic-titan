@@ -11,7 +11,8 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+
+from titan.api.typing_helpers import BaseModel, Field, typed_get, typed_post
 
 logger = logging.getLogger("titan.api.analysis")
 
@@ -23,7 +24,7 @@ router = APIRouter(prefix="/analysis", tags=["analysis"])
 # =============================================================================
 
 
-class ContradictionDetectRequest(BaseModel):  # type: ignore[misc]
+class ContradictionDetectRequest(BaseModel):
     """Request to detect contradictions in content."""
 
     content_pairs: list[dict[str, str]] = Field(
@@ -55,7 +56,7 @@ class ContradictionDetectRequest(BaseModel):  # type: ignore[misc]
     }
 
 
-class ContradictionResult(BaseModel):  # type: ignore[misc]
+class ContradictionResult(BaseModel):
     """A detected contradiction."""
 
     pair_index: int = Field(..., description="Index of the content pair")
@@ -67,7 +68,7 @@ class ContradictionResult(BaseModel):  # type: ignore[misc]
     text_b_excerpt: str = Field(..., description="Relevant excerpt from text_b")
 
 
-class ContradictionDetectResponse(BaseModel):  # type: ignore[misc]
+class ContradictionDetectResponse(BaseModel):
     """Response from contradiction detection."""
 
     contradictions: list[ContradictionResult] = Field(..., description="Detected contradictions")
@@ -75,7 +76,7 @@ class ContradictionDetectResponse(BaseModel):  # type: ignore[misc]
     processing_method: str = Field(..., description="heuristic or llm")
 
 
-class DialecticSynthesizeRequest(BaseModel):  # type: ignore[misc]
+class DialecticSynthesizeRequest(BaseModel):
     """Request to synthesize dialectically."""
 
     thesis: str = Field(..., description="The thesis statement or content")
@@ -104,7 +105,7 @@ class DialecticSynthesizeRequest(BaseModel):  # type: ignore[misc]
     }
 
 
-class DialecticSynthesisResult(BaseModel):  # type: ignore[misc]
+class DialecticSynthesisResult(BaseModel):
     """Result of dialectic synthesis."""
 
     synthesis: str = Field(..., description="The synthesized resolution")
@@ -113,7 +114,7 @@ class DialecticSynthesisResult(BaseModel):  # type: ignore[misc]
     reasoning: str = Field(..., description="Explanation of the synthesis approach")
 
 
-class SessionContradictionsResponse(BaseModel):  # type: ignore[misc]
+class SessionContradictionsResponse(BaseModel):
     """Response for session contradiction analysis."""
 
     session_id: str = Field(..., description="The inquiry session ID")
@@ -129,9 +130,7 @@ class SessionContradictionsResponse(BaseModel):  # type: ignore[misc]
 # =============================================================================
 
 
-@router.post(  # type: ignore[untyped-decorator]
-    "/contradictions/detect", response_model=ContradictionDetectResponse
-)
+@typed_post(router, "/contradictions/detect", response_model=ContradictionDetectResponse)
 async def detect_contradictions(request: ContradictionDetectRequest) -> ContradictionDetectResponse:
     """
     Detect contradictions in content pairs.
@@ -199,9 +198,7 @@ async def detect_contradictions(request: ContradictionDetectRequest) -> Contradi
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post(  # type: ignore[untyped-decorator]
-    "/dialectic/synthesize", response_model=DialecticSynthesisResult
-)
+@typed_post(router, "/dialectic/synthesize", response_model=DialecticSynthesisResult)
 async def synthesize_dialectic(request: DialecticSynthesizeRequest) -> DialecticSynthesisResult:
     """
     Synthesize a resolution from thesis and antithesis.
@@ -272,10 +269,11 @@ async def synthesize_dialectic(request: DialecticSynthesizeRequest) -> Dialectic
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get(
+@typed_get(
+    router,
     "/inquiry/{session_id}/contradictions",
     response_model=SessionContradictionsResponse,
-)  # type: ignore[untyped-decorator]
+)
 async def get_inquiry_contradictions(session_id: str) -> SessionContradictionsResponse:
     """
     Analyze an inquiry session for contradictions between stages.

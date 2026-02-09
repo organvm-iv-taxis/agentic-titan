@@ -19,6 +19,8 @@ from typing import Any
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from titan.api.typing_helpers import typed_get
+
 logger = logging.getLogger("titan.api")
 
 # Lazy registration to avoid circular imports
@@ -61,7 +63,7 @@ app.add_middleware(
 api_router = APIRouter(prefix="/api")
 
 
-@app.get("/health")  # type: ignore[untyped-decorator]
+@typed_get(app, "/health")
 async def health_check() -> dict[str, Any]:
     """Health check endpoint."""
     return {
@@ -71,7 +73,7 @@ async def health_check() -> dict[str, Any]:
     }
 
 
-@app.get("/ready")  # type: ignore[untyped-decorator]
+@typed_get(app, "/ready")
 async def readiness_check() -> dict[str, Any]:
     """Readiness check endpoint for Kubernetes."""
     return {

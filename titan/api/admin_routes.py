@@ -23,17 +23,26 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from datetime import UTC, datetime
 from typing import Any, cast
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
 
+from titan.api.typing_helpers import (
+    BaseModel,
+    Field,
+    typed_delete,
+    typed_get,
+    typed_post,
+    typed_put,
+)
 from titan.auth.middleware import require_admin
 from titan.auth.models import UserRole
 
 logger = logging.getLogger("titan.api.admin")
+_HEALTH_START_TIME = time.time()
 
 admin_router = APIRouter(
     prefix="/admin",
@@ -47,7 +56,7 @@ admin_router = APIRouter(
 # =============================================================================
 
 
-class DetailedHealthResponse(BaseModel):  # type: ignore[misc]
+class DetailedHealthResponse(BaseModel):
     """Detailed system health response."""
 
     status: str
@@ -56,7 +65,7 @@ class DetailedHealthResponse(BaseModel):  # type: ignore[misc]
     components: dict[str, dict[str, Any]]
 
 
-class MetricsSummaryResponse(BaseModel):  # type: ignore[misc]
+class MetricsSummaryResponse(BaseModel):
     """Summary of system metrics."""
 
     total_users: int
@@ -69,7 +78,7 @@ class MetricsSummaryResponse(BaseModel):  # type: ignore[misc]
     postgres_connected: bool
 
 
-class UserCreateRequest(BaseModel):  # type: ignore[misc]
+class UserCreateRequest(BaseModel):
     """Request to create a new user."""
 
     username: str = Field(..., min_length=3, max_length=100)
@@ -79,7 +88,7 @@ class UserCreateRequest(BaseModel):  # type: ignore[misc]
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
-class UserUpdateRequest(BaseModel):  # type: ignore[misc]
+class UserUpdateRequest(BaseModel):
     """Request to update a user."""
 
     email: str | None = None
@@ -89,7 +98,7 @@ class UserUpdateRequest(BaseModel):  # type: ignore[misc]
     metadata: dict[str, Any] | None = None
 
 
-class UserResponse(BaseModel):  # type: ignore[misc]
+class UserResponse(BaseModel):
     """User response for admin views."""
 
     id: str
@@ -101,7 +110,7 @@ class UserResponse(BaseModel):  # type: ignore[misc]
     last_login: str | None
 
 
-class ConfigResponse(BaseModel):  # type: ignore[misc]
+class ConfigResponse(BaseModel):
     """Configuration response."""
 
     key: str
@@ -110,13 +119,13 @@ class ConfigResponse(BaseModel):  # type: ignore[misc]
     editable: bool
 
 
-class ConfigUpdateRequest(BaseModel):  # type: ignore[misc]
+class ConfigUpdateRequest(BaseModel):
     """Request to update configuration."""
 
     value: Any
 
 
-class StalledBatchResponse(BaseModel):  # type: ignore[misc]
+class StalledBatchResponse(BaseModel):
     """Stalled batch information."""
 
     batch_id: str
@@ -126,7 +135,7 @@ class StalledBatchResponse(BaseModel):  # type: ignore[misc]
     recommended_action: str
 
 
-class RecoveryRequest(BaseModel):  # type: ignore[misc]
+class RecoveryRequest(BaseModel):
     """Batch recovery request."""
 
     strategy: str = Field(
@@ -135,7 +144,7 @@ class RecoveryRequest(BaseModel):  # type: ignore[misc]
     )
 
 
-class AuditEventResponse(BaseModel):  # type: ignore[misc]
+class AuditEventResponse(BaseModel):
     """Audit event response."""
 
     id: str
@@ -152,18 +161,13 @@ class AuditEventResponse(BaseModel):  # type: ignore[misc]
 # =============================================================================
 
 
-@admin_router.get("/health/detailed", response_model=DetailedHealthResponse)  # type: ignore[untyped-decorator]
+@typed_get(admin_router, "/health/detailed", response_model=DetailedHealthResponse)
 async def detailed_health() -> DetailedHealthResponse:
     """
     Get detailed system health including all components.
 
     Checks Redis, PostgreSQL, ChromaDB, and other services.
     """
-    import time
-
-    start_time = getattr(detailed_health, "_start_time", time.time())
-    detailed_health._start_time = start_time
-
     components: dict[str, dict[str, Any]] = {}
 
     # Check Redis
@@ -194,12 +198,12 @@ async def detailed_health() -> DetailedHealthResponse:
     return DetailedHealthResponse(
         status="healthy" if all_healthy else "degraded",
         version="0.1.0",
-        uptime_seconds=time.time() - start_time,
+        uptime_seconds=time.time() - _HEALTH_START_TIME,
         components=components,
     )
 
 
-@admin_router.get("/metrics/summary", response_model=MetricsSummaryResponse)  # type: ignore[untyped-decorator]
+@typed_get(admin_router, "/metrics/summary", response_model=MetricsSummaryResponse)
 async def metrics_summary() -> MetricsSummaryResponse:
     """
     Get summary of system metrics.
@@ -272,7 +276,7 @@ async def metrics_summary() -> MetricsSummaryResponse:
 # =============================================================================
 
 
-@admin_router.get("/users", response_model=list[UserResponse])  # type: ignore[untyped-decorator]
+@typed_get(admin_router, "/users", response_model=list[UserResponse])
 async def list_users(
     role: str | None = Query(None, description="Filter by role"),
     is_active: bool | None = Query(None, description="Filter by active status"),
@@ -312,8 +316,8 @@ async def list_users(
     ]
 
 
-@admin_router.post(  # type: ignore[untyped-decorator]
-    "/users", response_model=UserResponse, status_code=status.HTTP_201_CREATED
+@typed_post(
+    admin_router, "/users", response_model=UserResponse, status_code=status.HTTP_201_CREATED
 )
 async def create_user(request: UserCreateRequest) -> UserResponse:
     """Create a new user."""
@@ -371,7 +375,7 @@ async def create_user(request: UserCreateRequest) -> UserResponse:
     )
 
 
-@admin_router.put("/users/{user_id}", response_model=UserResponse)  # type: ignore[untyped-decorator]
+@typed_put(admin_router, "/users/{user_id}", response_model=UserResponse)
 async def update_user(user_id: str, request: UserUpdateRequest) -> UserResponse:
     """Update a user."""
     from titan.auth.storage import get_auth_storage
@@ -431,7 +435,7 @@ async def update_user(user_id: str, request: UserUpdateRequest) -> UserResponse:
     )
 
 
-@admin_router.delete("/users/{user_id}")  # type: ignore[untyped-decorator]
+@typed_delete(admin_router, "/users/{user_id}")
 async def delete_user(user_id: str) -> dict[str, str]:
     """Delete a user."""
     from titan.auth.storage import get_auth_storage
@@ -488,7 +492,7 @@ _config_store: dict[str, dict[str, Any]] = {
 }
 
 
-@admin_router.get("/config", response_model=list[ConfigResponse])  # type: ignore[untyped-decorator]
+@typed_get(admin_router, "/config", response_model=list[ConfigResponse])
 async def get_config() -> list[ConfigResponse]:
     """Get all configuration values."""
     return [
@@ -502,7 +506,7 @@ async def get_config() -> list[ConfigResponse]:
     ]
 
 
-@admin_router.put("/config/{key}", response_model=ConfigResponse)  # type: ignore[untyped-decorator]
+@typed_put(admin_router, "/config/{key}", response_model=ConfigResponse)
 async def update_config(key: str, request: ConfigUpdateRequest) -> ConfigResponse:
     """Update a configuration value."""
     if key not in _config_store:
@@ -534,9 +538,7 @@ async def update_config(key: str, request: ConfigUpdateRequest) -> ConfigRespons
 # =============================================================================
 
 
-@admin_router.get(  # type: ignore[untyped-decorator]
-    "/batches/stalled", response_model=list[StalledBatchResponse]
-)
+@typed_get(admin_router, "/batches/stalled", response_model=list[StalledBatchResponse])
 async def get_stalled_batches(
     threshold_minutes: int = Query(30, description="Minutes without progress"),
 ) -> list[StalledBatchResponse]:
@@ -564,7 +566,7 @@ async def get_stalled_batches(
         return []
 
 
-@admin_router.post("/batches/{batch_id}/recover")  # type: ignore[untyped-decorator]
+@typed_post(admin_router, "/batches/{batch_id}/recover")
 async def recover_batch(batch_id: str, request: RecoveryRequest) -> dict[str, Any]:
     """Recover a stalled batch."""
     try:
@@ -599,7 +601,7 @@ async def recover_batch(batch_id: str, request: RecoveryRequest) -> dict[str, An
         )
 
 
-@admin_router.delete("/batches/cleanup")  # type: ignore[untyped-decorator]
+@typed_delete(admin_router, "/batches/cleanup")
 async def cleanup_batches(
     retention_days: int = Query(30, description="Keep batches newer than this"),
 ) -> dict[str, Any]:
@@ -625,7 +627,7 @@ async def cleanup_batches(
 # =============================================================================
 
 
-@admin_router.post("/cache/flush")  # type: ignore[untyped-decorator]
+@typed_post(admin_router, "/cache/flush")
 async def flush_cache(
     pattern: str = Query("*", description="Key pattern to flush"),
 ) -> dict[str, Any]:
@@ -660,9 +662,7 @@ async def flush_cache(
         )
 
 
-@admin_router.get(  # type: ignore[untyped-decorator]
-    "/audit/events", response_model=list[AuditEventResponse]
-)
+@typed_get(admin_router, "/audit/events", response_model=list[AuditEventResponse])
 async def get_audit_events(
     event_type: str | None = Query(None, description="Filter by event type"),
     agent_id: str | None = Query(None, description="Filter by agent ID"),

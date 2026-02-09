@@ -16,6 +16,7 @@ from typing import Any
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 
+from titan.api.typing_helpers import typed_get, typed_websocket
 from titan.batch.orchestrator import get_batch_orchestrator
 
 logger = logging.getLogger("titan.api.batch_ws")
@@ -86,7 +87,7 @@ manager = BatchConnectionManager()
 # =============================================================================
 
 
-@batch_ws_router.websocket("/batch/{batch_id}/ws")  # type: ignore[untyped-decorator]
+@typed_websocket(batch_ws_router, "/batch/{batch_id}/ws")
 async def batch_progress_websocket(
     websocket: WebSocket,
     batch_id: str,
@@ -320,7 +321,7 @@ async def _receive_messages(
 # =============================================================================
 
 
-@batch_ws_router.get("/batch/{batch_id}/stream")  # type: ignore[untyped-decorator]
+@typed_get(batch_ws_router, "/batch/{batch_id}/stream")
 async def batch_progress_sse(batch_id: str) -> StreamingResponse:
     """
     Server-Sent Events endpoint for batch progress.

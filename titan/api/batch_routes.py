@@ -21,8 +21,8 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
 
+from titan.api.typing_helpers import BaseModel, Field, typed_get, typed_post
 from titan.batch.artifact_store import get_artifact_store
 from titan.batch.models import (
     BatchStatus,
@@ -43,7 +43,7 @@ batch_router = APIRouter(prefix="/batch", tags=["batch"])
 # =============================================================================
 
 
-class SubmitBatchRequest(BaseModel):  # type: ignore[misc]
+class SubmitBatchRequest(BaseModel):
     """Request to submit a new batch job."""
 
     topics: list[str] = Field(
@@ -73,7 +73,7 @@ class SubmitBatchRequest(BaseModel):  # type: ignore[misc]
     )
 
 
-class SubmitBatchResponse(BaseModel):  # type: ignore[misc]
+class SubmitBatchResponse(BaseModel):
     """Response after submitting a batch."""
 
     batch_id: str
@@ -83,7 +83,7 @@ class SubmitBatchResponse(BaseModel):  # type: ignore[misc]
     workflow: str
 
 
-class BatchStatusResponse(BaseModel):  # type: ignore[misc]
+class BatchStatusResponse(BaseModel):
     """Batch status and progress."""
 
     id: str
@@ -103,7 +103,7 @@ class BatchStatusResponse(BaseModel):  # type: ignore[misc]
     error: str | None
 
 
-class SessionStatusResponse(BaseModel):  # type: ignore[misc]
+class SessionStatusResponse(BaseModel):
     """Status of a single session in a batch."""
 
     id: str
@@ -118,7 +118,7 @@ class SessionStatusResponse(BaseModel):  # type: ignore[misc]
     duration_ms: int | None
 
 
-class ArtifactResponse(BaseModel):  # type: ignore[misc]
+class ArtifactResponse(BaseModel):
     """Artifact metadata response."""
 
     session_id: str
@@ -130,7 +130,7 @@ class ArtifactResponse(BaseModel):  # type: ignore[misc]
     created_at: str
 
 
-class BatchListResponse(BaseModel):  # type: ignore[misc]
+class BatchListResponse(BaseModel):
     """Summary for batch list."""
 
     id: str
@@ -146,7 +146,7 @@ class BatchListResponse(BaseModel):  # type: ignore[misc]
 # =============================================================================
 
 
-@batch_router.post("/submit", response_model=SubmitBatchResponse)  # type: ignore[untyped-decorator]
+@typed_post(batch_router, "/submit", response_model=SubmitBatchResponse)
 async def submit_batch(request: SubmitBatchRequest) -> SubmitBatchResponse:
     """
     Submit a new batch job.
@@ -188,7 +188,7 @@ async def submit_batch(request: SubmitBatchRequest) -> SubmitBatchResponse:
     )
 
 
-@batch_router.get("/list", response_model=list[BatchListResponse])  # type: ignore[untyped-decorator]
+@typed_get(batch_router, "/list", response_model=list[BatchListResponse])
 async def list_batches(
     status: str | None = Query(None, description="Filter by status"),
     limit: int = Query(50, description="Maximum batches to return", le=100),
@@ -222,7 +222,7 @@ async def list_batches(
     ]
 
 
-@batch_router.get("/{batch_id}", response_model=BatchStatusResponse)  # type: ignore[untyped-decorator]
+@typed_get(batch_router, "/{batch_id}", response_model=BatchStatusResponse)
 async def get_batch_status(batch_id: str) -> BatchStatusResponse:
     """Get the current status and progress of a batch."""
     orchestrator = get_batch_orchestrator()
@@ -253,9 +253,7 @@ async def get_batch_status(batch_id: str) -> BatchStatusResponse:
     )
 
 
-@batch_router.get(  # type: ignore[untyped-decorator]
-    "/{batch_id}/sessions", response_model=list[SessionStatusResponse]
-)
+@typed_get(batch_router, "/{batch_id}/sessions", response_model=list[SessionStatusResponse])
 async def get_batch_sessions(
     batch_id: str,
     status: str | None = Query(None, description="Filter by status"),
@@ -291,9 +289,7 @@ async def get_batch_sessions(
     ]
 
 
-@batch_router.post(  # type: ignore[untyped-decorator]
-    "/{batch_id}/start", response_model=BatchStatusResponse
-)
+@typed_post(batch_router, "/{batch_id}/start", response_model=BatchStatusResponse)
 async def start_batch(batch_id: str) -> BatchStatusResponse:
     """
     Start processing a batch.
@@ -328,7 +324,7 @@ async def start_batch(batch_id: str) -> BatchStatusResponse:
     )
 
 
-@batch_router.post("/{batch_id}/cancel")  # type: ignore[untyped-decorator]
+@typed_post(batch_router, "/{batch_id}/cancel")
 async def cancel_batch(batch_id: str) -> dict[str, Any]:
     """Cancel a running batch."""
     orchestrator = get_batch_orchestrator()
@@ -347,7 +343,7 @@ async def cancel_batch(batch_id: str) -> dict[str, Any]:
     }
 
 
-@batch_router.post("/{batch_id}/pause")  # type: ignore[untyped-decorator]
+@typed_post(batch_router, "/{batch_id}/pause")
 async def pause_batch(batch_id: str) -> dict[str, Any]:
     """Pause a running batch."""
     orchestrator = get_batch_orchestrator()
@@ -366,9 +362,7 @@ async def pause_batch(batch_id: str) -> dict[str, Any]:
     }
 
 
-@batch_router.get(  # type: ignore[untyped-decorator]
-    "/{batch_id}/artifacts", response_model=list[ArtifactResponse]
-)
+@typed_get(batch_router, "/{batch_id}/artifacts", response_model=list[ArtifactResponse])
 async def list_artifacts(batch_id: str) -> list[ArtifactResponse]:
     """List all artifacts for a batch."""
     orchestrator = get_batch_orchestrator()
@@ -397,7 +391,7 @@ async def list_artifacts(batch_id: str) -> list[ArtifactResponse]:
     ]
 
 
-@batch_router.get("/{batch_id}/export")  # type: ignore[untyped-decorator]
+@typed_get(batch_router, "/{batch_id}/export")
 async def export_batch(
     batch_id: str,
     format: str = Query("zip", description="Archive format"),
@@ -448,7 +442,7 @@ async def export_batch(
     )
 
 
-@batch_router.post("/{batch_id}/synthesize")  # type: ignore[untyped-decorator]
+@typed_post(batch_router, "/{batch_id}/synthesize")
 async def synthesize_batch(batch_id: str) -> dict[str, Any]:
     """
     Trigger cross-session synthesis for a batch.

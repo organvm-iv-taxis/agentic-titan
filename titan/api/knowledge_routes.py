@@ -10,7 +10,8 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel, Field
+
+from titan.api.typing_helpers import BaseModel, Field, typed_get
 
 logger = logging.getLogger("titan.api.knowledge")
 
@@ -22,7 +23,7 @@ router = APIRouter(prefix="/knowledge", tags=["knowledge"])
 # =============================================================================
 
 
-class SearchResult(BaseModel):  # type: ignore[misc]
+class SearchResult(BaseModel):
     """A knowledge search result."""
 
     key: str = Field(..., description="The item key/identifier")
@@ -33,7 +34,7 @@ class SearchResult(BaseModel):  # type: ignore[misc]
     metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
 
-class SearchResponse(BaseModel):  # type: ignore[misc]
+class SearchResponse(BaseModel):
     """Response from knowledge search."""
 
     query: str = Field(..., description="The search query")
@@ -42,7 +43,7 @@ class SearchResponse(BaseModel):  # type: ignore[misc]
     processing_time_ms: int = Field(..., description="Search processing time")
 
 
-class GraphNode(BaseModel):  # type: ignore[misc]
+class GraphNode(BaseModel):
     """A node in the knowledge graph."""
 
     id: str = Field(..., description="Node identifier")
@@ -51,7 +52,7 @@ class GraphNode(BaseModel):  # type: ignore[misc]
     properties: dict[str, Any] = Field(default_factory=dict, description="Node properties")
 
 
-class GraphEdge(BaseModel):  # type: ignore[misc]
+class GraphEdge(BaseModel):
     """An edge in the knowledge graph."""
 
     source: str = Field(..., description="Source node ID")
@@ -60,7 +61,7 @@ class GraphEdge(BaseModel):  # type: ignore[misc]
     weight: float = Field(default=1.0, description="Edge weight")
 
 
-class GraphResponse(BaseModel):  # type: ignore[misc]
+class GraphResponse(BaseModel):
     """Response containing a knowledge subgraph."""
 
     nodes: list[GraphNode] = Field(..., description="Graph nodes")
@@ -69,7 +70,7 @@ class GraphResponse(BaseModel):  # type: ignore[misc]
     depth: int = Field(..., description="Graph traversal depth")
 
 
-class KnowledgeStatsResponse(BaseModel):  # type: ignore[misc]
+class KnowledgeStatsResponse(BaseModel):
     """Knowledge base statistics."""
 
     total_entries: int = Field(..., description="Total knowledge entries")
@@ -85,7 +86,7 @@ class KnowledgeStatsResponse(BaseModel):  # type: ignore[misc]
 # =============================================================================
 
 
-@router.get("/search", response_model=SearchResponse)  # type: ignore[untyped-decorator]
+@typed_get(router, "/search", response_model=SearchResponse)
 async def search_knowledge(
     query: str = Query(..., min_length=1, description="Search query"),
     limit: int = Query(default=10, ge=1, le=100, description="Maximum results"),
@@ -160,7 +161,7 @@ async def search_knowledge(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/graph", response_model=GraphResponse)  # type: ignore[untyped-decorator]
+@typed_get(router, "/graph", response_model=GraphResponse)
 async def get_knowledge_graph(
     center: str | None = Query(default=None, description="Center node ID"),
     depth: int = Query(default=2, ge=1, le=5, description="Traversal depth"),
@@ -298,7 +299,7 @@ async def get_knowledge_graph(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/stats", response_model=KnowledgeStatsResponse)  # type: ignore[untyped-decorator]
+@typed_get(router, "/stats", response_model=KnowledgeStatsResponse)
 async def get_knowledge_stats() -> KnowledgeStatsResponse:
     """
     Get knowledge base statistics.
