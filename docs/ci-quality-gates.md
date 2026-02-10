@@ -1,9 +1,7 @@
 # CI Quality Gates
 
-This repository uses a staged quality-gate model:
-
-1. Blocking jobs protect the core import boundary and test reliability.
-2. Advisory jobs keep full-repo debt visible while we ratchet enforcement.
+This repository now uses a fully blocking quality-gate model for lint, typecheck,
+and runtime safety.
 
 ## Blocking Jobs
 
@@ -21,39 +19,60 @@ This repository uses a staged quality-gate model:
 - Validates that `.ci/completion_status.md` truthfully reports mypy quarantine
   state from `pyproject.toml`.
 
-5. `lint`
+5. `allow-secret-governance`
+- Enforces review policy for `# allow-secret` annotations using
+  `.ci/check_allow_secret_usage.py`.
+
+6. `lint`
 - Runs `ruff check` and `ruff format --check` on files listed in
   `.ci/core_import_boundary_files.txt`.
 
-6. `typecheck-core`
+7. `lint-full`
+- Runs `ruff check .` and `ruff format --check .` as blocking full-repo gates.
+
+8. `typecheck-core`
 - Runs mypy only on `.ci/typecheck_core_targets.txt` with
   `--follow-imports=skip`.
 
-7. `test-core-blocking`
+9. `typecheck-full`
+- Runs full-repo mypy over `hive agents titan mcp dashboard` as blocking.
+
+10. `test-core-blocking`
 - Runs `pytest tests/ -q` in a CI-like environment with Redis.
 
-## Advisory Jobs
+11. `security`
+- Runs Gitleaks secret scan.
 
-1. `lint-full-advisory`
-- Full-repo Ruff check and format checks.
+## Governance Cadence
 
-2. `typecheck-full-advisory`
-- Full-repo mypy for broad visibility while debt is burned down.
+1. Weekly governance audit runs in `.github/workflows/governance-audit.yml`.
+2. Owner rotation and triage responsibilities are defined in
+   `docs/ci-governance-ownership.md`.
+3. Completion status consistency is validated by:
+- `.ci/check_mypy_quarantine.py`
+- `.ci/check_core_boundary_manifest.py`
+- `.ci/update_completion_status.py --check`
 
-## Ratchet Policy
+## Quality SLOs
 
-1. Expand blocking lint/typecheck scopes only when current scope is green.
-2. Land scope expansion and cleanup in the same PR.
-3. Keep advisory jobs enabled until blocking scopes cover agreed core surfaces.
+1. Lint SLO
+- `ruff check .` and `ruff format --check .` must remain green on `main` and
+  PR heads.
 
-## Mypy Quarantine Semantics
+2. Typecheck SLO
+- Full-repo mypy must remain green with quarantine module count fixed at `0`.
 
-1. A green full-repo mypy command is only considered "true blocking complete"
-   when quarantine module count is zero.
-2. If `[[tool.mypy.overrides]]` has `ignore_errors=true` modules, Tranche 3 is
-   considered `PARTIAL` even if command output is green.
-3. `.ci/check_mypy_quarantine.py` enforces status-file consistency with the
-   current quarantine count.
+3. Runtime SLO
+- CI full test suite (`pytest tests/ -q`) remains green with warning-hardening
+  pass (`RuntimeWarning` and `on_event` deprecation escalations).
+
+4. Governance SLO
+- Weekly governance audit success rate target: `>= 95%` rolling 30-day window.
+- New `# allow-secret` annotations require explicit review before merge.
+
+5. Drift Response SLO
+- Any quality-gate regression on `main` receives remediation PR or rollback
+  within 24 hours.
 
 ## How To Add A New Core Boundary File
 

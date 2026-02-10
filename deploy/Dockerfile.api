@@ -8,15 +8,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for caching
-COPY pyproject.toml .
+# Copy application code
+COPY . .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -e . \
     && pip install --no-cache-dir fastapi uvicorn jinja2 prometheus-client
-
-# Copy application code
-COPY . .
 
 # Expose ports
 EXPOSE 8080 9100

@@ -80,6 +80,30 @@ jobs:
         run: |
           python .ci/check_mypy_quarantine.py
 
+  allow-secret-governance:
+    name: Allow-Secret Governance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Validate allow-secret annotations
+        run: |
+          python .ci/check_allow_secret_usage.py --report .ci/current_allow_secret_report.txt
+
+      - name: Upload allow-secret report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allow-secret-report
+          path: .ci/current_allow_secret_report.txt
+          if-no-files-found: warn
+          retention-days: 14
+
   import-boundary-tests:
     name: Import Boundary Tests
     runs-on: ubuntu-latest
@@ -125,10 +149,9 @@ jobs:
         run: |
           xargs ruff format --check < .ci/core_import_boundary_files.txt
 
-  lint-full-advisory:
-    name: Lint (Advisory - Full Repo)
+  lint-full:
+    name: Lint (Blocking - Full Repo)
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
@@ -143,10 +166,10 @@ jobs:
           pip install ruff
 
       - name: Run full-repo ruff check
-        run: ruff check . --output-format=github || true
+        run: ruff check . --output-format=github
 
       - name: Run full-repo ruff format check
-        run: ruff format --check . || true
+        run: ruff format --check .
 
   typecheck-core:
     name: Type Check (Blocking - Core Scope)
@@ -170,10 +193,9 @@ jobs:
           xargs mypy --ignore-missing-imports --follow-imports=skip \
             < .ci/typecheck_core_targets.txt
 
-  typecheck-full-advisory:
-    name: Type Check (Advisory - Full Repo)
+  typecheck-full:
+    name: Type Check (Blocking - Full Repo)
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
@@ -189,7 +211,7 @@ jobs:
           pip install mypy types-redis types-PyYAML
 
       - name: Run full-repo mypy
-        run: mypy --ignore-missing-imports hive agents titan mcp dashboard || true
+        run: mypy --ignore-missing-imports hive agents titan mcp dashboard
 
   test-core-blocking:
     name: Test (Blocking - Full Suite, Python 3.11)

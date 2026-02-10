@@ -1,0 +1,41 @@
+name: Governance Audit
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 13 * * 1" # Mondays 13:00 UTC
+
+jobs:
+  governance-audit:
+    name: Governance Audit (Weekly)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dashboard,metrics]"
+
+      - name: Run governance checks
+        run: |
+          python .ci/check_core_boundary_manifest.py
+          python .ci/check_mypy_quarantine.py
+          python .ci/check_allow_secret_usage.py --report .ci/current_allow_secret_report.txt
+          python .ci/update_completion_status.py --check
+
+      - name: Upload governance reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: governance-audit-report
+          path: |
+            .ci/current_allow_secret_report.txt
+            .ci/completion_status.md
+          if-no-files-found: warn
+          retention-days: 14

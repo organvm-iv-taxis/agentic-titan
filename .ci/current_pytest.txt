@@ -80,4 +80,4 @@ tests/workflows/test_personality.py ............................         [ 96%]
 tests/workflows/test_temporal.py .......................                 [ 98%]
 tests/workflows/test_visualization.py ..........................         [100%]
 
-====================== 1312 passed, 16 skipped in 15.92s =======================
+====================== 1312 passed, 16 skipped in 16.50s =======================

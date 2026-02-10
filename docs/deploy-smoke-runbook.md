@@ -11,24 +11,24 @@ Provide a deterministic smoke verification path after deployment changes.
 ## Docker Compose Smoke
 1. Start stack:
 ```bash
-docker compose -f deploy/compose.yaml up -d
+CHROMADB_HOST_PORT=18000 docker compose -f deploy/compose.yaml --profile api up -d
 ```
 2. Check container health:
 ```bash
-docker compose -f deploy/compose.yaml ps
+CHROMADB_HOST_PORT=18000 docker compose -f deploy/compose.yaml --profile api ps
 ```
-3. Verify API liveness/readiness:
+3. Verify API liveness and dashboard entrypoint:
 ```bash
-curl -sf http://localhost:8000/health
-curl -sf http://localhost:8000/ready
+curl -sf http://localhost:8080/api/status
+curl -sfI http://localhost:8080/
 ```
 4. Verify metrics endpoint:
 ```bash
-curl -sf http://localhost:8000/metrics | head -n 20
+curl -sf http://localhost:9100/metrics | head -n 20
 ```
-5. Verify basic CLI operation:
+5. Tear down stack after capture:
 ```bash
-.venv/bin/titan status
+CHROMADB_HOST_PORT=18000 docker compose -f deploy/compose.yaml --profile api down
 ```
 
 ## Kubernetes / K3s Smoke
@@ -52,6 +52,11 @@ kubectl -n titan port-forward deploy/titan-api 8000:8000
 curl -sf http://localhost:8000/health
 curl -sf http://localhost:8000/ready
 ```
+
+### K3s Prerequisite Note
+If `kubectl apply -k deploy/k3s/` fails on `traefik.io/v1alpha1` resources,
+install the Traefik `Middleware` CRD in the target cluster before running the
+full smoke sequence.
 
 ## Artifact Capture
 Save command outputs to `.ci/` for traceability:

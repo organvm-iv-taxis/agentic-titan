@@ -43,7 +43,7 @@ services:
     image: chromadb/chroma:latest
     container_name: titan-chromadb
     ports:
-      - "8000:8000"
+      - "${CHROMADB_HOST_PORT:-8000}:8000"
     volumes:
       - chroma-data:/chroma/chroma
     environment:

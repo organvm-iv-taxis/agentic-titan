@@ -1,0 +1,4 @@
+[deploy-smoke-metrics] no metrics sample captured.
+reason=compose_api_stack_degraded
+details=postgres_unhealthy_due_no_space_left_on_device
+reference=.ci/deploy_smoke_compose.txt

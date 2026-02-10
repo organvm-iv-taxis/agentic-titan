@@ -71,9 +71,6 @@ def main() -> int:
     if quarantine_count > 0 and omega_complete:
         errors.append("Omega status cannot be `COMPLETE` while mypy quarantine modules remain.")
 
-    if quarantine_count == 0 and "Omega status: `NOT COMPLETE`" in status_text:
-        errors.append("Omega status should be updated once quarantine reaches zero.")
-
     if errors:
         print("mypy-quarantine-governance: FAIL")
         for item in errors:

@@ -1,0 +1,70 @@
+[deploy-smoke-k3s] started 2026-02-10T15:06:06Z
+[step] kubectl version --client
+Client Version: v1.34.1
+Kustomize Version: v5.7.1
+[step] kubectl cluster-info
+Kubernetes control plane is running at https://127.0.0.1:63752
+CoreDNS is running at https://127.0.0.1:63752/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
+
+To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
+[step] kubectl get ns titan
+Error from server (NotFound): namespaces "titan" not found
+[step] kubectl apply -k deploy/k3s/ --dry-run=client
+# Warning: 'commonLabels' is deprecated. Please use 'labels' instead. Run 'kustomize edit fix' to update your Kustomization automatically.
+namespace/titan created (dry run)
+resourcequota/titan-resource-quota created (dry run)
+serviceaccount/titan-agent created (dry run)
+serviceaccount/titan-api created (dry run)
+serviceaccount/titan-scheduler created (dry run)
+serviceaccount/titan-worker created (dry run)
+role.rbac.authorization.k8s.io/titan-api-role created (dry run)
+role.rbac.authorization.k8s.io/titan-scheduler-role created (dry run)
+role.rbac.authorization.k8s.io/titan-worker-role created (dry run)
+rolebinding.rbac.authorization.k8s.io/titan-api-binding created (dry run)
+rolebinding.rbac.authorization.k8s.io/titan-scheduler-binding created (dry run)
+rolebinding.rbac.authorization.k8s.io/titan-worker-binding created (dry run)
+configmap/titan-celery-config created (dry run)
+configmap/titan-config created (dry run)
+secret/postgres-credentials created (dry run)
+secret/titan-celery-secrets created (dry run)
+secret/titan-secrets created (dry run)
+service/chromadb created (dry run)
+service/postgres created (dry run)
+service/redis created (dry run)
+service/titan-api created (dry run)
+service/titan-flower created (dry run)
+limitrange/titan-limit-range created (dry run)
+priorityclass.scheduling.k8s.io/titan-critical created (dry run)
+priorityclass.scheduling.k8s.io/titan-high created (dry run)
+priorityclass.scheduling.k8s.io/titan-low created (dry run)
+priorityclass.scheduling.k8s.io/titan-normal created (dry run)
+deployment.apps/titan-agent created (dry run)
+deployment.apps/titan-api created (dry run)
+deployment.apps/titan-celery-beat created (dry run)
+deployment.apps/titan-celery-worker created (dry run)
+deployment.apps/titan-flower created (dry run)
+statefulset.apps/chromadb created (dry run)
+statefulset.apps/postgres created (dry run)
+statefulset.apps/redis created (dry run)
+poddisruptionbudget.policy/titan-api-pdb created (dry run)
+poddisruptionbudget.policy/titan-celery-worker-pdb created (dry run)
+poddisruptionbudget.policy/titan-postgres-pdb created (dry run)
+poddisruptionbudget.policy/titan-redis-pdb created (dry run)
+poddisruptionbudget.policy/titan-worker-pdb created (dry run)
+horizontalpodautoscaler.autoscaling/titan-agent-hpa created (dry run)
+horizontalpodautoscaler.autoscaling/titan-api-hpa created (dry run)
+horizontalpodautoscaler.autoscaling/titan-celery-worker-hpa created (dry run)
+ingress.networking.k8s.io/titan-flower-ingress created (dry run)
+ingress.networking.k8s.io/titan-ingress created (dry run)
+networkpolicy.networking.k8s.io/allow-api-ingress created (dry run)
+networkpolicy.networking.k8s.io/allow-chromadb-access created (dry run)
+networkpolicy.networking.k8s.io/allow-egress-external created (dry run)
+networkpolicy.networking.k8s.io/allow-postgres-access created (dry run)
+networkpolicy.networking.k8s.io/allow-prometheus-scrape created (dry run)
+networkpolicy.networking.k8s.io/allow-redis-access created (dry run)
+networkpolicy.networking.k8s.io/allow-worker-coordination created (dry run)
+networkpolicy.networking.k8s.io/default-deny-ingress created (dry run)
+error: resource mapping not found for name: "titan-ratelimit" namespace: "titan" from "deploy/k3s/": no matches for kind "Middleware" in version "traefik.io/v1alpha1"
+ensure CRDs are installed first
+[deploy-smoke-k3s] status=PARTIAL
+reason=traefik_middleware_crd_missing_in_local_cluster
