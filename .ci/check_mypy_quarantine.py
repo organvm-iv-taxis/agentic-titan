@@ -55,8 +55,7 @@ def main() -> int:
 
     if declared_count is None:
         errors.append(
-            "Missing 'Mypy quarantine modules: `<count>`' line in "
-            ".ci/completion_status.md."
+            "Missing 'Mypy quarantine modules: `<count>`' line in .ci/completion_status.md."
         )
     elif declared_count != quarantine_count:
         errors.append(

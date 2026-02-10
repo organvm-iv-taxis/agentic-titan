@@ -625,10 +625,12 @@ class ImageGenerationTool:
         if openai_key:
             self._backends["dall-e"] = DallEBackend(api_key=openai_key)  # allow-secret
             self._backends["dall-e-3"] = DallEBackend(
-                api_key=openai_key, model="dall-e-3"  # allow-secret
+                api_key=openai_key,  # allow-secret
+                model="dall-e-3",  # allow-secret
             )  # allow-secret
             self._backends["dall-e-2"] = DallEBackend(
-                api_key=openai_key, model="dall-e-2"  # allow-secret
+                api_key=openai_key,  # allow-secret
+                model="dall-e-2",  # allow-secret
             )  # allow-secret
 
         # Stable Diffusion (local - lazy loaded)

@@ -638,7 +638,12 @@ async def cleanup_batches(
 
         logger.info(f"Admin triggered batch cleanup: {result}")
 
-        return result
+        if not isinstance(result, dict):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Cleanup returned non-dict result",
+            )
+        return {str(key): value for key, value in result.items()}
     except Exception as e:
         logger.error(f"Batch cleanup failed: {e}")
         raise HTTPException(

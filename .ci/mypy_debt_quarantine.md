@@ -9,7 +9,7 @@ This file tracks modules temporarily quarantined from full-repo mypy blocking.
 
 ## Current Quarantine Scope
 - Source of truth: `[[tool.mypy.overrides]]` block in `pyproject.toml` under the comment `temporary mypy debt quarantine`.
-- Current size: 76 modules.
+- Current size: 71 modules.
 
 ## Burn-Down Protocol
 1. Pick highest-error modules from `.ci/current_mypy.txt`.

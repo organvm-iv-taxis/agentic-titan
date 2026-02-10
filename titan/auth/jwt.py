@@ -44,7 +44,10 @@ class JoseJWTModule(Protocol):
     def encode(self, payload: dict[str, Any], key: str, algorithm: str) -> str: ...
 
     def decode(
-        self, token: str, key: str, algorithms: list[str]  # allow-secret
+        self,
+        token: str,  # allow-secret
+        key: str,  # allow-secret
+        algorithms: list[str],  # allow-secret
     ) -> dict[str, Any]: ...  # allow-secret
 
 

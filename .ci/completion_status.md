@@ -74,7 +74,7 @@ Last updated: 2026-02-10 (local run)
   - Initial full-repo mypy debt at tranche start: `28` errors in `23` files.
   - Current strict core-scope debt: `0` errors (blocking gate green).
   - Current full-repo command result: `0` errors with quarantine override active.
-  - Mypy quarantine modules: `76` (from `[[tool.mypy.overrides]] ignore_errors=true` in `pyproject.toml`).
+  - Mypy quarantine modules: `71` (from `[[tool.mypy.overrides]] ignore_errors=true` in `pyproject.toml`).
   - Gate command currently passing under quarantine:
     - `.venv/bin/mypy --ignore-missing-imports hive agents titan mcp dashboard`
   - Completed type-fix ratchet set:
@@ -101,6 +101,12 @@ Last updated: 2026-02-10 (local run)
     - `titan/learning/rlhf.py`
     - `titan/learning/reward_model.py`
     - `titan/learning/dpo_trainer.py`
+  - Latest Tranche 3B quarantine burn-down:
+    - removed `titan.batch.orchestrator`
+    - removed `titan.memory.chromadb_backend`
+    - removed `titan.metrics.assembly_tracker`
+    - removed `titan.tools.image_gen`
+    - removed `titan.tools.m365`
 - Tranche 4 (Runtime Test Completion): `GO`
   - Current summary: `1312 passed, 16 skipped`.
   - Gate commands passing:
@@ -114,4 +120,4 @@ Last updated: 2026-02-10 (local run)
 ## Completion Verdict
 - Completion program gate status: `ALL GREEN` for blocking lint/core-type/runtime tests.
 - Omega status: `NOT COMPLETE` until mypy quarantine is burned down and full-repo typecheck is truly blocking without `ignore_errors` quarantine.
-- Blocking ratchets remaining: `76` quarantined modules for full-repo typecheck closure.
+- Blocking ratchets remaining: `71` quarantined modules for full-repo typecheck closure.
