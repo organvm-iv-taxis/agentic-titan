@@ -1,5 +1,13 @@
 # Agentic Titan
 
+[![CI](https://github.com/organvm-iv-taxis/agentic-titan/actions/workflows/ci.yml/badge.svg)](https://github.com/organvm-iv-taxis/agentic-titan/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/badge/coverage-pending-lightgrey)](https://github.com/organvm-iv-taxis/agentic-titan)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/organvm-iv-taxis/agentic-titan/blob/main/LICENSE)
+[![Organ IV](https://img.shields.io/badge/Organ-IV%20Taxis-10B981)](https://github.com/organvm-iv-taxis)
+[![Status](https://img.shields.io/badge/status-active-brightgreen)](https://github.com/organvm-iv-taxis/agentic-titan)
+[![Python](https://img.shields.io/badge/lang-Python-informational)](https://github.com/organvm-iv-taxis/agentic-titan)
+
+
 [![ORGAN-IV: Orchestration](https://img.shields.io/badge/ORGAN--IV-Orchestration-e65100?style=flat-square)](https://github.com/organvm-iv-taxis)
 [![Tests](https://img.shields.io/badge/tests-1312%20passing-brightgreen?style=flat-square)]()
 [![Python](https://img.shields.io/badge/python-%E2%89%A53.11-blue?style=flat-square)]()
