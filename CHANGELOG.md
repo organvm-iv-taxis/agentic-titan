@@ -1,29 +1,24 @@
 # Changelog
 
-All notable changes to this repository are documented in this file.
+All notable changes to this project will be documented in this file.
 
-## 2026-02-10 - Omega Closure Program (Phase Completion)
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
 
 ### Added
-- Weekly governance audit workflow: `.github/workflows/governance-audit.yml`.
-- Allow-secret governance policy checker: `.ci/check_allow_secret_usage.py`.
-- Allow-secret baseline inventory: `.ci/allow_secret_baseline.txt`.
-- Completion status refresh utility: `.ci/update_completion_status.py`.
-- Governance ownership and rotation guide: `docs/ci-governance-ownership.md`.
-- Deploy smoke evidence report: `docs/deploy-smoke-evidence.md`.
-- Release evidence bundle template: `docs/release-evidence-template.md`.
-- Release closure notes and signoff records.
 
-### Changed
-- Full-repo lint in CI is now blocking (`lint-full` job).
-- Full-repo mypy in CI is now blocking (`typecheck-full` job).
-- CI now enforces `allow-secret` annotation governance and uploads reports.
-- `deploy/Dockerfile.api` build sequence corrected for editable install.
-- `deploy/compose.yaml` now supports `CHROMADB_HOST_PORT` override.
-- Quality-gate documentation updated with SLOs and governance cadence.
+- Platinum Sprint: CI/CD workflow, standardized badge row, ADR documentation
+- Initial CHANGELOG following Keep a Changelog format
 
-### Operational Notes
-- Quality gates are green locally and in latest CI.
-- Deploy smoke evidence captured with local-environment caveats
-  (compose degraded due host disk exhaustion; k3s partial due missing Traefik
-  Middleware CRD).
+## [0.1.0] - 2026-02-11
+
+### Added
+
+- Initial public release as part of the organvm eight-organ system
+- Core project structure and documentation
+- README with portfolio-quality documentation
+
+[Unreleased]: https://github.com/organvm-iv-taxis/agentic-titan/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/organvm-iv-taxis/agentic-titan/releases/tag/v0.1.0
