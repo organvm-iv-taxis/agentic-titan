@@ -1,0 +1,54 @@
+schema_version: '1.0'
+repo: agentic-titan
+org: organvm-iv-taxis
+generated: '2026-02-13T03:33:58.093872+00:00'
+total_materials: 6
+materials:
+- filename: chaos_test.md
+  source_path: /Users/4jp/Workspace/agentic-titan/plans/chaos_test.md
+  sha256: 69c058630bcd7710ebe7233c0a6c041e79207bf4f947e889192e555b55e4380c
+  size_bytes: 2022
+  last_modified: '2026-02-08T19:17:53.026698+00:00'
+  classification_rule: direct_repo_match
+  confidence: 1.0
+  target_subdir: docs/source-materials/theory/
+- filename: test_fission_recovery.py
+  source_path: /Users/4jp/Workspace/agentic-titan/tests/chaos/test_fission_recovery.py
+  sha256: eeb18d3c4b641b9880fb907e14dadf389b0e40f70504b7cdae9ce00e4a2c4af2
+  size_bytes: 1341
+  last_modified: '2026-02-08T19:18:24.121987+00:00'
+  classification_rule: direct_repo_match
+  confidence: 1.0
+  target_subdir: docs/source-materials/prototypes/
+- filename: lexicon_viz.js
+  source_path: /Users/4jp/Workspace/agentic-titan/dashboard/static/js/lexicon_viz.js
+  sha256: a16719a16ba1769e696077b1af3e2c2c03ef0feffe1608cdd1f76c9ee4479a88
+  size_bytes: 1915
+  last_modified: '2026-02-08T19:13:16.053786+00:00'
+  classification_rule: direct_repo_match
+  confidence: 1.0
+  target_subdir: docs/source-materials/prototypes/
+- filename: lexicon.html
+  source_path: /Users/4jp/Workspace/agentic-titan/dashboard/templates/lexicon.html
+  sha256: 853d1001cc0f365143facd28b027fc3804ec544fa72d9c4d3cace25fe7afbee5
+  size_bytes: 1593
+  last_modified: '2026-02-08T19:13:44.867788+00:00'
+  classification_rule: direct_repo_match
+  confidence: 1.0
+  target_subdir: docs/source-materials/prototypes/
+- filename: config.py
+  source_path: /Users/4jp/Workspace/agentic-titan/titan/core/config.py
+  sha256: 9c5e0b8750b2a4369c6ed5121b386757d452adce37454e2a4783a8d12bc82cda
+  size_bytes: 2163
+  last_modified: '2026-02-08T19:04:10.110550+00:00'
+  classification_rule: direct_repo_match
+  confidence: 1.0
+  target_subdir: docs/source-materials/prototypes/
+- filename: spec_generator.py
+  source_path: /Users/4jp/Workspace/agentic-titan/titan/workflows/spec_generator.py
+  sha256: 20115da41bc4f1adebbe698763d06c7b0acaf35447145e6e55317d3b3af65358
+  size_bytes: 4075
+  last_modified: '2026-02-08T19:04:22.572432+00:00'
+  classification_rule: direct_repo_match
+  confidence: 1.0
+  target_subdir: docs/source-materials/prototypes/
