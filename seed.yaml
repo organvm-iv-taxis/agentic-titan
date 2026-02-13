@@ -1,0 +1,45 @@
+# seed.yaml — Automation Contract for organvm-iv-taxis/agentic-titan
+# Schema: seed/v1.0
+# Generated: 2026-02-12 (AUTONOMY Sprint)
+# Category: flagship_with_deps
+
+schema_version: "1.0"
+organ: IV
+organ_name: Orchestration
+repo: agentic-titan
+org: organvm-iv-taxis
+
+metadata:
+  implementation_status: PRODUCTION
+  tier: flagship
+  promotion_status: PUBLIC_PROCESS
+  last_validated: "2026-02-11"
+  generated: "2026-02-12"
+  sprint: "AUTONOMY"
+
+agents:
+  - name: ci
+    trigger: on_push
+    workflow: .github/workflows/ci-python.yml
+    description: "Continuous integration pipeline"
+
+produces:
+  - type: dependency
+    description: Consumed by organvm-iv-taxis/agent--claude-smith
+    consumers: [organvm-iv-taxis/agent--claude-smith]
+  - type: dependency
+    description: Consumed by organvm-v-logos/public-process
+    consumers: [organvm-v-logos/public-process]
+
+consumes:
+  - type: dependency
+    source: organvm-i-theoria/recursive-engine--generative-entity
+    description: Depends on organvm-i-theoria/recursive-engine--generative-entity
+
+subscriptions:
+  - event: repo.created
+    source: any
+    action: "Update registry, assign seed.yaml template"
+  - event: ci.passed
+    source: any
+    action: Check if repo qualifies for promotion
